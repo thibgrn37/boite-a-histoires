@@ -61,12 +61,18 @@ public final class Player implements MediaPlayer.OnPreparedListener, MediaPlayer
         @Override public void onReceive(Context context, Intent intent) { pause(); }
     };
 
+    private long lastTick = 0;
+
     private final Runnable ticker = new Runnable() {
         @Override public void run() {
+            long now = android.os.SystemClock.elapsedRealtime();
             if (isPlaying()) {
+                if (lastTick > 0) Store.addListened(Math.min(now - lastTick, 10000));
                 savePosition();
                 updateSession();
+                if (Store.limitReached()) pause();
             }
+            lastTick = now;
             main.postDelayed(this, 3000);
         }
     };

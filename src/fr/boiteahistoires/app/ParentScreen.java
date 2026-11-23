@@ -84,12 +84,17 @@ final class ParentScreen {
         podcastsBox = section(col, "Mes podcasts");
 
         // Limite d'épisodes
-        LinearLayout lim = section(col, "Épisodes par jour");
-        final TextView limTv = Ui.text(a, "", 16, Ui.DARK, true);
-        lim.addView(stepper2(limTv));
+        LinearLayout lim = section(col, "Limites d'écoute");
+        lim.addView(Ui.text(a, "Toute la journée", 16, Ui.DARK, true));
+        limitBlock(lim, false);
+        View sep = new View(a);
+        sep.setBackgroundColor(0x22000000);
+        lim.addView(sep, Ui.lpMargins(a, ViewGroup.LayoutParams.MATCH_PARENT, 1, 0, 14, 0, 10));
+        lim.addView(Ui.text(a, "Le soir (heures du mode nuit)", 16, Ui.DARK, true));
+        limitBlock(lim, true);
         playedTv = small("");
         lim.addView(playedTv);
-        lim.addView(small("Quand la limite est atteinte, la lecture s'arrête et une lune s'affiche ; impossible de relancer. Le compteur repart à zéro chaque jour à minuit."));
+        lim.addView(small("Quand une limite est atteinte, la lecture s'arrête et une lune s'affiche ; impossible de relancer. La limite du jour repart à zéro à minuit, celle du soir à chaque début de soirée. Les heures du soir se règlent dans « Mode nuit »."));
         Button resetBtn = Ui.button(a, "Remettre le compteur à zéro", Ui.BLUE);
         resetBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { Store.resetPlayed(); refresh(); }
@@ -319,7 +324,9 @@ final class ParentScreen {
     }
 
     void refresh() {
-        playedTv.setText("Écoutés aujourd'hui : " + Store.playedToday());
+        String lt = "Aujourd'hui : " + Store.playedToday() + " épisode(s) fini(s), " + Store.listenedTodayMs() / 60000 + " min d'écoute";
+        if (Store.inEvening()) lt += "\nCe soir : " + Store.playedEvening() + " épisode(s), " + Store.listenedEveningMs() / 60000 + " min";
+        playedTv.setText(lt);
         String j = Store.journal();
         logTv.setText(j.isEmpty() ? "Rien pour l'instant." : j);
         String us = Store.updateStatus();
@@ -462,6 +469,58 @@ final class ParentScreen {
         }
     }
 
+    /** Réglage d'une limite : choix épisodes / minutes + valeur. */
+    private void limitBlock(LinearLayout box, final boolean evening) {
+        final TextView val = Ui.text(a, "", 15, Ui.DARK, false);
+        LinearLayout types = new LinearLayout(a);
+        final Button[] tb = new Button[2];
+        String[] names = {"En épisodes", "En minutes"};
+        for (int i = 0; i < 2; i++) {
+            final int t = i;
+            tb[i] = Ui.button(a, names[i], Ui.BLUE);
+            tb[i].setTextSize(14);
+            tb[i].setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    if (evening) Store.setEveningType(t); else Store.setLimitType(t);
+                    paintLimit(val, tb, evening);
+                }
+            });
+            LinearLayout.LayoutParams lp = Ui.lpMargins(a, 0, ViewGroup.LayoutParams.WRAP_CONTENT, i == 0 ? 0 : 6, 6, 0, 0);
+            lp.weight = 1;
+            types.addView(tb[i], lp);
+        }
+        box.addView(types);
+        box.addView(stepperTv(val, new Runnable() {
+            @Override public void run() { step(evening, -1); paintLimit(val, tb, evening); }
+        }, new Runnable() {
+            @Override public void run() { step(evening, +1); paintLimit(val, tb, evening); }
+        }));
+        paintLimit(val, tb, evening);
+    }
+
+    private static void step(boolean evening, int dir) {
+        int type = evening ? Store.eveningType() : Store.limitType();
+        int v = evening ? Store.eveningLimit() : Store.episodeLimit();
+        if (type == 1) {
+            int[] mins = {0, 5, 10, 15, 20, 30, 45, 60, 90, 120, 150, 180, 240};
+            int r = dir > 0 ? mins[mins.length - 1] : 0;
+            if (dir > 0) { for (int m : mins) if (m > v) { r = m; break; } }
+            else { for (int m : mins) if (m < v) r = m; }
+            v = r;
+        } else v = v + dir;
+        if (evening) Store.setEveningLimit(v); else Store.setEpisodeLimit(v);
+    }
+
+    private void paintLimit(TextView val, Button[] tb, boolean evening) {
+        int type = evening ? Store.eveningType() : Store.limitType();
+        int v = evening ? Store.eveningLimit() : Store.episodeLimit();
+        for (int i = 0; i < 2; i++) tb[i].setBackground(Ui.ripple(Ui.rounded(i == type ? Ui.ORANGE : Ui.GREY, Ui.dp(a, 12))));
+        if (v == 0) val.setText("Pas de limite");
+        else if (type == 1) val.setText(v >= 60 ? (v / 60) + " h " + (v % 60 == 0 ? "" : (v % 60) + " min") : v + " minutes");
+        else val.setText(v + " épisode" + (v > 1 ? "s" : ""));
+        if (playedTv != null) refresh();
+    }
+
     private View stepperTv(TextView label, final Runnable minus, final Runnable plus) {
         LinearLayout r = new LinearLayout(a);
         r.setGravity(Gravity.CENTER_VERTICAL);
@@ -517,15 +576,17 @@ final class ParentScreen {
                     String feedUrl = Net.resolveFeed(link, name);
                     FeedParser.Feed f = FeedParser.parse(Net.bytes(feedUrl));
                     if (f.items.isEmpty()) throw new Exception("Ce lien ne contient aucun épisode audio.");
-                    String n = !name.isEmpty() ? name : (f.title.isEmpty() ? "Podcast" : f.title);
+                    String n = !f.title.isEmpty() ? f.title : (name.isEmpty() ? "Podcast" : name);
                     Store.Podcast p = Store.addPodcast(n, feedUrl, f.imageUrl, 0);
                     if (p == null) throw new Exception("Ce podcast est déjà dans la liste.");
                     Store.mergeEpisodes(p.id, f.items);
                     Sync.runNow(a);
                     msg = "« " + n + " » ajouté (" + f.items.size() + " épisodes dans le flux). Téléchargement lancé ✔";
                     ok = true;
-                } catch (Exception e) {
+                    Store.log("Ajouté : « " + n + " » " + feedUrl);
+                } catch (Throwable e) {
                     msg = "Impossible d'ajouter : " + e.getMessage();
+                    Store.log("Ajout de « " + name + " » " + link + " impossible : " + e);
                 }
                 final String m = msg;
                 final boolean success = ok;

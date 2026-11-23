@@ -417,19 +417,77 @@ public final class Store {
     public static void setFlag(String k) { prefs.edit().putBoolean(k, true).apply(); }
 
     // Limite d'épisodes par jour (0 = illimité) et luminosité imposée (0 = réglage du téléphone)
+    // Limites : journée et soir (soir = heures du mode nuit). Type 0 = épisodes, 1 = minutes. Valeur 0 = pas de limite.
     public static int episodeLimit() { return prefs.getInt("limite", 0); }
-    public static void setEpisodeLimit(int n) { prefs.edit().putInt("limite", Math.max(0, Math.min(50, n))).apply(); changed(); }
+    public static void setEpisodeLimit(int n) { prefs.edit().putInt("limite", clampLimit(limitType(), n)).apply(); changed(); }
+    public static int limitType() { return prefs.getInt("limite_type", 0); }
+    public static void setLimitType(int t) { prefs.edit().putInt("limite_type", t).putInt("limite", 0).apply(); changed(); }
+    public static int eveningLimit() { return prefs.getInt("soir_limite", 0); }
+    public static void setEveningLimit(int n) { prefs.edit().putInt("soir_limite", clampLimit(eveningType(), n)).apply(); changed(); }
+    public static int eveningType() { return prefs.getInt("soir_type", 0); }
+    public static void setEveningType(int t) { prefs.edit().putInt("soir_type", t).putInt("soir_limite", 0).apply(); changed(); }
+    private static int clampLimit(int type, int n) { return Math.max(0, Math.min(type == 1 ? 600 : 50, n)); }
+
     private static String today() { return new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(new java.util.Date()); }
+
+    /** Vrai pendant les heures du soir / de la nuit (mêmes heures que le mode nuit automatique). */
+    public static boolean inEvening() {
+        int h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
+        int a = nightStart(), b = nightEnd();
+        if (a == b) return false;
+        return a < b ? (h >= a && h < b) : (h >= a || h < b);
+    }
+
+    /** Identifiant de la soirée en cours (date du début de soirée). */
+    private static String eveningKey() {
+        java.util.Calendar c = java.util.Calendar.getInstance();
+        if (nightStart() > nightEnd() && c.get(java.util.Calendar.HOUR_OF_DAY) < nightEnd()) c.add(java.util.Calendar.DAY_OF_MONTH, -1);
+        return "s" + new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(c.getTime());
+    }
+
     public static int playedToday() {
         if (!today().equals(prefs.getString("ecoutes_jour", ""))) return 0;
         return prefs.getInt("ecoutes", 0);
     }
-    public static void addPlayed() {
-        prefs.edit().putString("ecoutes_jour", today()).putInt("ecoutes", playedToday() + 1).apply();
+    public static long listenedTodayMs() {
+        if (!today().equals(prefs.getString("ecoutes_jour", ""))) return 0;
+        return prefs.getLong("ecoute_ms", 0);
+    }
+    public static int playedEvening() {
+        if (!inEvening() || !eveningKey().equals(prefs.getString("soir_cle", ""))) return 0;
+        return prefs.getInt("soir_ep", 0);
+    }
+    public static long listenedEveningMs() {
+        if (!inEvening() || !eveningKey().equals(prefs.getString("soir_cle", ""))) return 0;
+        return prefs.getLong("soir_ms", 0);
+    }
+
+    private static void add(int episodes, long ms) {
+        SharedPreferences.Editor ed = prefs.edit();
+        ed.putString("ecoutes_jour", today()).putInt("ecoutes", playedToday() + episodes).putLong("ecoute_ms", listenedTodayMs() + ms);
+        if (inEvening()) ed.putString("soir_cle", eveningKey()).putInt("soir_ep", playedEvening() + episodes).putLong("soir_ms", listenedEveningMs() + ms);
+        ed.apply();
+    }
+    public static void addPlayed() { add(1, 0); changed(); }
+    public static void addListened(long ms) { add(0, ms); }
+
+    public static void resetPlayed() {
+        prefs.edit().putString("ecoutes_jour", today()).putInt("ecoutes", 0).putLong("ecoute_ms", 0)
+                .putString("soir_cle", eveningKey()).putInt("soir_ep", 0).putLong("soir_ms", 0).apply();
         changed();
     }
-    public static void resetPlayed() { prefs.edit().putString("ecoutes_jour", today()).putInt("ecoutes", 0).apply(); changed(); }
-    public static boolean limitReached() { int l = episodeLimit(); return l > 0 && playedToday() >= l; }
+
+    public static boolean dayLimitReached() {
+        int l = episodeLimit();
+        if (l <= 0) return false;
+        return limitType() == 1 ? listenedTodayMs() >= l * 60000L : playedToday() >= l;
+    }
+    public static boolean eveningLimitReached() {
+        int l = eveningLimit();
+        if (l <= 0 || !inEvening()) return false;
+        return eveningType() == 1 ? listenedEveningMs() >= l * 60000L : playedEvening() >= l;
+    }
+    public static boolean limitReached() { return dayLimitReached() || eveningLimitReached(); }
 
     public static int brightness() { return prefs.getInt("luminosite", 0); }
     public static void setBrightness(int b) { prefs.edit().putInt("luminosite", b).apply(); }

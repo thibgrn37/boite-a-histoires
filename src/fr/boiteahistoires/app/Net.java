@@ -12,6 +12,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -101,20 +102,50 @@ public final class Net {
     private static final Pattern APPLE_ID = Pattern.compile("id(\\d{5,})");
     private static final Pattern DIGITS = Pattern.compile("/(\\d{5,})(?:[/?#]|$)");
 
-    /** Cherche un podcast sur Apple Podcasts ; garde le résultat dont le nom contient {@code mustContain}. */
-    public static String searchFeed(String term, String mustContain) throws Exception {
-        String q = URLEncoder.encode(term, "UTF-8");
+    static String norm(String s) {
+        String n = java.text.Normalizer.normalize(s == null ? "" : s, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "").toLowerCase(java.util.Locale.ROOT);
+        return n.replaceAll("[^a-z0-9]+", " ").trim();
+    }
+
+    /** Ressemblance entre le nom cherché et le nom d'un podcast (0 à 100). */
+    static int score(String wanted, String found) {
+        String w = norm(wanted), f = norm(found);
+        if (w.isEmpty() || f.isEmpty()) return 0;
+        if (w.equals(f)) return 100;
+        if ((" " + f + " ").contains(" " + w + " ")) return 85;
+        if ((" " + w + " ").contains(" " + f + " ")) return 70;
+        String[] ws = w.split(" ");
+        java.util.Set<String> fs = new java.util.HashSet<>(java.util.Arrays.asList(f.split(" ")));
+        int hit = 0, tot = 0;
+        for (String x : ws) { if (x.length() < 3) continue; tot++; if (fs.contains(x)) hit++; }
+        return tot == 0 ? 0 : hit * 60 / tot;
+    }
+
+    /** Cherche un podcast par son nom sur Apple Podcasts et garde le plus ressemblant. */
+    public static String searchFeed(String term, String unused) throws Exception {
+        String q = URLEncoder.encode(term.trim(), "UTF-8");
+        String best = null, bestName = null;
+        int bestScore = -1;
+        List<String> seen = new java.util.ArrayList<>();
         for (String country : new String[]{"FR", "BE", "CH", "CA"}) {
             JSONObject o = new JSONObject(text("https://itunes.apple.com/search?media=podcast&entity=podcast&limit=25&country=" + country + "&term=" + q));
             JSONArray r = o.optJSONArray("results");
             for (int i = 0; r != null && i < r.length(); i++) {
                 JSONObject it = r.getJSONObject(i);
-                String name = it.optString("collectionName", "").toLowerCase();
+                String name = it.optString("collectionName", "");
                 String f = it.optString("feedUrl", "");
-                if (!f.isEmpty() && name.contains(mustContain.toLowerCase())) return f;
+                if (f.isEmpty()) continue;
+                if (seen.size() < 3 && !seen.contains(name)) seen.add(name);
+                int sc = score(term, name);
+                if (sc > bestScore) { bestScore = sc; best = f; bestName = name; }
             }
+            if (bestScore >= 85) break;
         }
-        throw new IOException("introuvable sur Apple Podcasts");
+        if (best == null) throw new IOException("aucun podcast trouvé pour « " + term.trim() + " » sur Apple Podcasts.");
+        if (bestScore < 50) throw new IOException("pas de podcast qui s'appelle vraiment « " + term.trim() + " ». Trouvés : " + seen + ". Colle plutôt le lien du podcast.");
+        Store.log("Recherche « " + term.trim() + " » → « " + bestName + " »");
+        return best;
     }
 
     /**
@@ -125,15 +156,7 @@ public final class Net {
         String s = link == null ? "" : link.trim();
         if (s.isEmpty()) {
             if (name == null || name.trim().isEmpty()) throw new IOException("Indique un nom ou un lien.");
-            String q = URLEncoder.encode(name.trim(), "UTF-8");
-            JSONObject o = new JSONObject(text("https://itunes.apple.com/search?media=podcast&entity=podcast&country=FR&limit=5&term=" + q));
-            JSONArray r = o.optJSONArray("results");
-            if (r == null || r.length() == 0) throw new IOException("Aucun podcast trouvé pour « " + name.trim() + " ».");
-            for (int i = 0; i < r.length(); i++) {
-                String f = r.getJSONObject(i).optString("feedUrl", "");
-                if (!f.isEmpty()) return f;
-            }
-            throw new IOException("Podcast trouvé mais sans flux public.");
+            return searchFeed(name, null);
         }
         if (!s.startsWith("http://") && !s.startsWith("https://")) s = "https://" + s;
         if (s.contains("apple.com")) {
