@@ -82,7 +82,7 @@ Si `dpm set-device-owner` refuse et que tu ne veux pas de compte Xiaomi :
 4. **Épinglage :** Paramètres → Mots de passe et sécurité → Confidentialité → Épinglage d'application → activé.
 5. Ouvre l'appli. Elle demande toute seule à s'épingler : réponds « Épingler ». Elle le redemande à chaque allumage du téléphone, et il suffit d'un appui.
 
-Au démarrage ou au réveil de l'écran, on arrive directement sur l'appli. Pour sortir sans code, fais un appui long simultané sur Retour + Aperçu. Pour installer une mise à jour dans ce mode, va dans l'espace parents et touche « Vérifier les mises à jour », puis confirme. La première fois, autorise « Installer des applis inconnues » pour Boîte à histoires.
+Au démarrage ou au réveil de l'écran, on arrive directement sur l'appli. Pour sortir : espace parents → « Quitter le mode kiosque », qui désépingle et ne se réépingle pas tout seul. Depuis le Mac, tu peux aussi faire `./adb shell am task lock stop`. Pour installer une mise à jour dans ce mode, va dans l'espace parents et touche « Vérifier les mises à jour », puis confirme. La première fois, autorise « Installer des applis inconnues » pour Boîte à histoires.
 
 ## 5. Utilisation
 
