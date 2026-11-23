@@ -62,6 +62,20 @@ public final class Player implements MediaPlayer.OnPreparedListener, MediaPlayer
     };
 
     private long lastTick = 0;
+    /** Histoire en cours quand la limite a été atteinte : on peut l'écouter jusqu'au bout. */
+    private String graceEpisodeId = null;
+
+    /** Vrai si l'enfant peut lancer / reprendre l'épisode courant. */
+    public boolean canPlayCurrent() {
+        if (!Store.limitReached()) return true;
+        Store.Episode e = current();
+        return e != null && e.id.equals(graceEpisodeId);
+    }
+
+    /** Vrai si l'enfant peut lancer cet épisode. */
+    public boolean canPlay(Store.Episode e) {
+        return !Store.limitReached() || (e != null && e.id.equals(graceEpisodeId));
+    }
 
     private final Runnable ticker = new Runnable() {
         @Override public void run() {
@@ -70,8 +84,11 @@ public final class Player implements MediaPlayer.OnPreparedListener, MediaPlayer
                 if (lastTick > 0) Store.addListened(Math.min(now - lastTick, 10000));
                 savePosition();
                 updateSession();
-                if (Store.limitReached()) pause();
+                // Temps écoulé en pleine histoire : on la laisse finir, mais on n'en relancera pas d'autre.
+                Store.Episode cur = current();
+                if (Store.limitReached() && graceEpisodeId == null && cur != null) graceEpisodeId = cur.id;
             }
+            if (!Store.limitReached()) graceEpisodeId = null;
             lastTick = now;
             main.postDelayed(this, 3000);
         }
@@ -241,7 +258,7 @@ public final class Player implements MediaPlayer.OnPreparedListener, MediaPlayer
     }
 
     private void startInternal() {
-        if (Store.limitReached()) { wantPlay = false; fire(); return; }
+        if (!canPlayCurrent()) { wantPlay = false; fire(); return; }
         if (!requestFocus()) { fire(); return; }
         VolumeCap.enforce(ctx);
         try { mp.start(); } catch (Exception e) { Log.e(Store.TAG, "start", e); }
@@ -272,6 +289,7 @@ public final class Player implements MediaPlayer.OnPreparedListener, MediaPlayer
             Store.setPosition(e.id, 0);
             Store.setDone(e.id, true);
             Store.addPlayed();
+            graceEpisodeId = null;
         }
         if (hasNext() && !Store.limitReached()) {
             index++;

@@ -304,7 +304,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
     }
 
     void tapPlay() {
-        if (!player.isActive() && Store.limitReached()) { showSleep(); return; }
+        if (!player.isActive() && !player.canPlayCurrent()) { showSleep(); return; }
         player.toggle();
     }
 
@@ -352,7 +352,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
     @Override
     public void onPlayerChanged() {
         boolean active = player.isActive();
-        if (wasActive && !active && Store.limitReached() && screen != PARENT) showSleep();
+        if (wasActive && !active && !player.canPlayCurrent() && screen != PARENT) showSleep();
         wasActive = active;
         updateKeepOn();
         updateMini();
@@ -535,7 +535,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         grid.setAdapter(gridAdapter);
         grid.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override public void onItemClick(AdapterView<?> a, View v, int pos, long id) {
-                if (Store.limitReached()) { showSleep(); return; }
+                if (!player.canPlay(epList.get(pos))) { showSleep(); return; }
                 player.play(new ArrayList<>(epList), pos);
                 showPlayer();
             }
@@ -690,7 +690,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
             plTitle.setText(e.title);
             Images.load(plImg, Store.displayImage(e), Ui.dp(this, 400));
         }
-        plPlay.setImageResource(Store.limitReached() && !player.isActive() ? R.drawable.ic_moon
+        plPlay.setImageResource(!player.canPlayCurrent() && !player.isActive() ? R.drawable.ic_moon
                 : (player.isActive() ? R.drawable.ic_pause : R.drawable.ic_play));
         plPrev.setAlpha(player.hasPrevious() ? 1f : 0.35f);
         plNext.setAlpha(player.hasNext() ? 1f : 0.35f);
