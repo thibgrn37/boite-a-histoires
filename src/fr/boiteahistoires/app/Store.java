@@ -434,6 +434,27 @@ public final class Store {
     public static int brightness() { return prefs.getInt("luminosite", 0); }
     public static void setBrightness(int b) { prefs.edit().putInt("luminosite", b).apply(); }
 
+    // Mode nuit : 0 = automatique selon l'heure, 1 = toujours jour, 2 = toujours nuit
+    public static int nightMode() { return prefs.getInt("nuit_mode", 0); }
+    public static void setNightMode(int m) { prefs.edit().putInt("nuit_mode", m).apply(); }
+    public static int nightStart() { return prefs.getInt("nuit_debut", 19); }
+    public static int nightEnd() { return prefs.getInt("nuit_fin", 7); }
+    public static void setNightStart(int h) { prefs.edit().putInt("nuit_debut", (h + 24) % 24).apply(); }
+    public static void setNightEnd(int h) { prefs.edit().putInt("nuit_fin", (h + 24) % 24).apply(); }
+    public static boolean isNightNow() {
+        int m = nightMode();
+        if (m == 1) return false;
+        if (m == 2) return true;
+        int h = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY);
+        int a = nightStart(), b = nightEnd();
+        if (a == b) return false;
+        return a < b ? (h >= a && h < b) : (h >= a || h < b);
+    }
+
+    // Écran qui s'assombrit sans toucher (secondes, 0 = jamais)
+    public static int dimDelay() { return prefs.getInt("veille_s", 30); }
+    public static void setDimDelay(int s) { prefs.edit().putInt("veille_s", Math.max(0, Math.min(600, s))).apply(); }
+
     public static boolean firstRunDone() { return prefs.getBoolean("init", false); }
     public static void setFirstRunDone() { prefs.edit().putBoolean("init", true).apply(); }
 }

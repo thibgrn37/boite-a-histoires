@@ -62,9 +62,12 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
 
     private ParentScreen parent;
 
+    private int ticks = 0;
+
     private final Runnable tick = new Runnable() {
         @Override public void run() {
             if (screen == PLAYER) updateProgress();
+            if (++ticks % 60 == 0) applyTheme();
             handler.postDelayed(this, 500);
         }
     };
@@ -80,7 +83,9 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         dismissKeyguard();
         player = Player.get(this);
         root = new FrameLayout(this);
-        root.setBackgroundColor(Ui.CREAM);
+        Ui.setNight(Store.isNightNow());
+        root.setBackgroundColor(Ui.BG);
+        applyBarsColor();
         setContentView(root);
         showHome();
         if (getIntent() != null && getIntent().getBooleanExtra("secours", false)) showParent();
@@ -98,7 +103,8 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         dismissKeyguard();
         if (screen != PARENT) Kiosk.sync(this);
         applyImmersive();
-        applyBrightness();
+        applyTheme();
+        wake();
         VolumeCap.enforce(this);
         onLibraryChanged();
         handler.post(tick);
@@ -110,6 +116,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         Store.removeListener(this);
         player.removeListener(this);
         handler.removeCallbacks(tick);
+        handler.removeCallbacks(dimTask);
     }
 
     @Override
@@ -162,12 +169,96 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         } catch (Exception ignored) { }
     }
 
-    /** Luminosité imposée par le parent (0 = réglage normal du téléphone). */
+    /** Luminosité imposée par le parent (0 = réglage normal du téléphone), ou très basse si l'écran est assombri. */
     void applyBrightness() {
         android.view.WindowManager.LayoutParams lp = getWindow().getAttributes();
         int b = Store.brightness();
-        lp.screenBrightness = b <= 0 ? android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE : b / 100f;
+        if (dimmed) lp.screenBrightness = 0.01f;
+        else lp.screenBrightness = b <= 0 ? android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE : b / 100f;
         getWindow().setAttributes(lp);
+    }
+
+    // ------------------------------------------------------------------ écran qui s'assombrit
+
+    private boolean dimmed = false;
+    private boolean swallowTouch = false;
+    private View dimOverlay;
+
+    private final Runnable dimTask = new Runnable() {
+        @Override public void run() {
+            if (screen == PARENT || codeOverlay != null) return;
+            dimmed = true;
+            applyBrightness();
+            if (dimOverlay == null) {
+                dimOverlay = new View(MainActivity.this);
+                dimOverlay.setBackgroundColor(0xB0000000);
+            }
+            if (dimOverlay.getParent() == null) {
+                root.addView(dimOverlay, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            }
+        }
+    };
+
+    /** Rallume l'écran et relance le compte à rebours d'assombrissement. */
+    void wake() {
+        dimmed = false;
+        if (dimOverlay != null && dimOverlay.getParent() != null) ((ViewGroup) dimOverlay.getParent()).removeView(dimOverlay);
+        applyBrightness();
+        handler.removeCallbacks(dimTask);
+        int d = Store.dimDelay();
+        if (d > 0 && screen != PARENT) handler.postDelayed(dimTask, d * 1000L);
+        updateKeepOn();
+    }
+
+    /** Pendant la lecture, l'écran reste allumé (assombri) : un simple toucher le rallume. */
+    private void updateKeepOn() {
+        boolean on = player != null && player.isActive() && Store.dimDelay() > 0 && screen != PARENT;
+        if (on) getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        int act = ev.getActionMasked();
+        if (act == MotionEvent.ACTION_DOWN) {
+            if (dimmed) {
+                // Le premier toucher sert juste à rallumer l'écran : il n'appuie sur rien.
+                swallowTouch = true;
+                wake();
+                return true;
+            }
+            swallowTouch = false;
+            wake();
+        }
+        if (swallowTouch) {
+            if (act == MotionEvent.ACTION_UP || act == MotionEvent.ACTION_CANCEL) swallowTouch = false;
+            return true;
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+
+    // ------------------------------------------------------------------ jour / nuit
+
+    /** Passe en thème nuit (fond noir) ou jour selon l'heure et le réglage parent. */
+    void applyTheme() {
+        if (!Ui.setNight(Store.isNightNow())) return;
+        root.setBackgroundColor(Ui.BG);
+        applyBarsColor();
+        switch (screen) {
+            case HOME: showHome(); break;
+            case EPISODES: showEpisodes(podcastId); break;
+            case PLAYER: showPlayer(); break;
+            default: break;
+        }
+        if (dimmed && dimOverlay != null && dimOverlay.getParent() == null) {
+            root.addView(dimOverlay, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        }
+    }
+
+    private void applyBarsColor() {
+        getWindow().getDecorView().setBackgroundColor(Ui.BG);
+        getWindow().setStatusBarColor(Ui.BG);
+        getWindow().setNavigationBarColor(Ui.BG);
     }
 
     private View sleepOverlay;
@@ -246,6 +337,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         boolean active = player.isActive();
         if (wasActive && !active && Store.limitReached() && screen != PARENT) showSleep();
         wasActive = active;
+        updateKeepOn();
         updateMini();
         if (screen == PLAYER) updatePlayer();
         if (screen == EPISODES && gridAdapter != null) gridAdapter.notifyDataSetChanged();
@@ -268,7 +360,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         logo.setImageResource(R.drawable.ic_notif);
         logo.setImageTintList(ColorStateList.valueOf(Ui.ORANGE));
         title.addView(logo, new LinearLayout.LayoutParams(Ui.dp(this, 40), Ui.dp(this, 40)));
-        TextView t = Ui.text(this, getString(R.string.app_name), 22, Ui.DARK, true);
+        TextView t = Ui.text(this, getString(R.string.app_name), 22, Ui.INK, true);
         t.setPadding(Ui.dp(this, 12), 0, 0, 0);
         title.addView(t);
         title.setPadding(Ui.dp(this, 20), 0, 0, 0);
@@ -324,7 +416,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
             }
         });
         body.addView(grid);
-        TextView emptyTv = Ui.text(this, "Aucun podcast pour l'instant.\nLes parents peuvent en ajouter dans l'espace parents.", 18, Ui.GREY, false);
+        TextView emptyTv = Ui.text(this, "Aucun podcast pour l'instant.\nLes parents peuvent en ajouter dans l'espace parents.", 18, Ui.SUB, false);
         emptyTv.setGravity(Gravity.CENTER);
         emptyText = emptyTv;
         emptyText.setVisibility(podList.isEmpty() ? View.VISIBLE : View.GONE);
@@ -374,7 +466,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         mini.letter.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24);
         Images.load(mini.image, Store.cover(p.id), Ui.dp(this, 64));
         header.addView(mini, Ui.lpMargins(this, Ui.dp(this, 64), Ui.dp(this, 64), 16, 0, 12, 0));
-        TextView name = Ui.text(this, p.name, 20, Ui.DARK, true);
+        TextView name = Ui.text(this, p.name, 20, Ui.INK, true);
         name.setMaxLines(2);
         header.addView(name, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         col.addView(header);
@@ -400,7 +492,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
                     cell.setOrientation(LinearLayout.VERTICAL);
                     card = new Ui.Card(MainActivity.this);
                     cell.addView(card, Ui.lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-                    title = Ui.text(MainActivity.this, "", 13, Ui.GREY, false);
+                    title = Ui.text(MainActivity.this, "", 13, Ui.SUB, false);
                     title.setMaxLines(2);
                     title.setPadding(Ui.dp(MainActivity.this, 4), Ui.dp(MainActivity.this, 6), Ui.dp(MainActivity.this, 4), 0);
                     cell.addView(title);
@@ -431,9 +523,9 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         empty.setGravity(Gravity.CENTER);
         ImageView hg = new ImageView(this);
         hg.setImageResource(R.drawable.ic_hourglass);
-        hg.setImageTintList(ColorStateList.valueOf(Ui.GREY));
+        hg.setImageTintList(ColorStateList.valueOf(Ui.SUB));
         empty.addView(hg, new LinearLayout.LayoutParams(Ui.dp(this, 96), Ui.dp(this, 96)));
-        TextView et = Ui.text(this, "Les histoires arrivent dès que le téléphone est en Wi-Fi.", 16, Ui.GREY, false);
+        TextView et = Ui.text(this, "Les histoires arrivent dès que le téléphone est en Wi-Fi.", 16, Ui.SUB, false);
         et.setGravity(Gravity.CENTER);
         et.setPadding(Ui.dp(this, 32), Ui.dp(this, 16), Ui.dp(this, 32), 0);
         empty.addView(et);
@@ -451,7 +543,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
     private View makeMiniBar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setBackground(Ui.rounded(Ui.WHITE, Ui.dp(this, 24)));
+        bar.setBackground(Ui.rounded(Ui.SURFACE, Ui.dp(this, 24)));
         bar.setElevation(Ui.dp(this, 8));
         int p = Ui.dp(this, 10);
         bar.setPadding(p, p, Ui.dp(this, 16), p);
@@ -460,7 +552,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         miniImg.setBackground(Ui.rounded(Ui.colorFor("x"), Ui.dp(this, 16)));
         miniImg.setClipToOutline(true);
         bar.addView(miniImg, new LinearLayout.LayoutParams(Ui.dp(this, 72), Ui.dp(this, 72)));
-        miniTitle = Ui.text(this, "", 15, Ui.DARK, false);
+        miniTitle = Ui.text(this, "", 15, Ui.INK, false);
         miniTitle.setMaxLines(2);
         miniTitle.setPadding(Ui.dp(this, 14), 0, Ui.dp(this, 10), 0);
         bar.addView(miniTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
@@ -525,7 +617,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         });
         col.addView(plImg, new LinearLayout.LayoutParams(size, size));
 
-        plTitle = Ui.text(this, "", 16, Ui.GREY, false);
+        plTitle = Ui.text(this, "", 16, Ui.SUB, false);
         plTitle.setGravity(Gravity.CENTER);
         plTitle.setMaxLines(2);
         col.addView(plTitle, Ui.lpMargins(this, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 32, 16, 32, 0));
@@ -533,7 +625,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         plProgress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         plProgress.setMax(1000);
         plProgress.setProgressTintList(ColorStateList.valueOf(Ui.ORANGE));
-        plProgress.setProgressBackgroundTintList(ColorStateList.valueOf(0xFFFFCCBC));
+        plProgress.setProgressBackgroundTintList(ColorStateList.valueOf(Ui.TRACK));
         plProgress.setScaleY(3f);
         col.addView(plProgress, Ui.lpMargins(this, ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 16), 40, 20, 40, 0));
 
@@ -672,12 +764,16 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         root.removeAllViews();
         parent = new ParentScreen(this);
         root.addView(parent.view());
+        wake();
     }
 
     void closeParent() {
         parent = null;
         Kiosk.sync(this);
         applyImmersive();
+        Ui.night = !Store.isNightNow();
         showHome();
+        applyTheme();
+        wake();
     }
 }

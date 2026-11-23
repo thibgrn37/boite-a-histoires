@@ -174,25 +174,44 @@ public final class Sync {
         return null;
     }
 
-    /** Ajoute une fois les podcasts proposés par défaut (cherchés par leur nom sur Apple Podcasts). */
+    /** Ajoute une fois les podcasts proposés par défaut : flux direct, sinon lien Apple, sinon recherche du nom. */
     static void seedDefaults() {
-        String[][] wanted = {{"Les aventures du professeur Caillou", "caillou"}};
+        String[][] wanted = {{"Les aventures du professeur Caillou", "caillou",
+                "https://radiofrance-podcast.net/podcast09/podcast_9cfc0cf4-6d0d-4ffa-a327-0c099c366d3c.xml",
+                "https://podcasts.apple.com/fr/podcast/les-aventures-du-professeur-caillou/id1811582936"}};
         for (String[] w : wanted) {
-            String key = "seed2_" + Store.hash(w[0]);
+            String key = "seed3_" + Store.hash(w[0]);
             if (Store.flag(key)) continue;
             boolean present = false;
-            for (Store.Podcast p : Store.podcasts()) if (p.name.toLowerCase().contains(w[1])) present = true;
+            for (Store.Podcast p : Store.podcasts()) {
+                if (p.feedUrl.contains("9cfc0cf4-6d0d-4ffa-a327-0c099c366d3c")) present = true;
+                else if (p.name.toLowerCase().contains("cailloux")) {
+                    // 1.5 à 1.7 avaient trouvé un autre podcast (« professeur cailloux ») : on le retire.
+                    Store.removePodcast(p.id);
+                    Store.log("Mauvais podcast « " + p.name + " » retiré");
+                }
+            }
             if (present) { Store.setFlag(key); continue; }
+            FeedParser.Feed f = null;
+            String feed = null;
+            for (int attempt = 0; attempt < 2 && f == null; attempt++) {
+                try {
+                    feed = attempt == 0 ? w[2] : Net.resolveFeed(w[3], "");
+                    f = FeedParser.parse(Net.bytes(feed));
+                    Store.log("« " + w[0] + " » : flux lu " + feed);
+                } catch (Throwable ex) {
+                    f = null;
+                    Store.log("« " + w[0] + " » essai " + (attempt + 1) + " raté : " + ex);
+                }
+            }
+            if (f == null) continue;
             try {
-                String feed = Net.searchFeed(w[0], w[1]);
-                Store.log("« " + w[0] + " » : flux trouvé " + feed);
-                FeedParser.Feed f = FeedParser.parse(Net.bytes(feed));
                 Store.Podcast p = Store.addPodcast(f.title.isEmpty() ? w[0] : f.title, feed, f.imageUrl, 0);
                 if (p != null) Store.mergeEpisodes(p.id, f.items);
                 Store.log("« " + w[0] + " » ajouté (" + f.items.size() + " épisodes)");
                 Store.setFlag(key);
-            } catch (Exception ex) {
-                Store.log("Ajout de « " + w[0] + " » impossible : " + ex.getMessage());
+            } catch (Throwable ex) {
+                Store.log("Ajout de « " + w[0] + " » impossible : " + ex);
             }
         }
     }

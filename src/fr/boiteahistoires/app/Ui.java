@@ -26,6 +26,22 @@ final class Ui {
     static final int DARK = 0xFF3E2723;
     static final int GREY = 0xFF8D6E63;
     static final int WHITE = 0xFFFFFFFF;
+    // Couleurs du thème (jour / nuit) utilisées par les écrans de l'enfant.
+    static int BG = CREAM, INK = DARK, SUB = GREY, SURFACE = WHITE, TRACK = 0xFFFFCCBC;
+    static boolean night = false;
+
+    /** @return true si le thème a changé. */
+    static boolean setNight(boolean n) {
+        if (n == night) return false;
+        night = n;
+        BG = n ? 0xFF000000 : CREAM;
+        INK = n ? 0xFFD7C4B0 : DARK;
+        SUB = n ? 0xFF8A7B6E : GREY;
+        SURFACE = n ? 0xFF1C1917 : WHITE;
+        TRACK = n ? 0xFF3E2723 : 0xFFFFCCBC;
+        return true;
+    }
+
     static final int[] PALETTE = {0xFFFFB74D, 0xFF4FC3F7, 0xFF81C784, 0xFFF06292, 0xFFBA68C8, 0xFFFFD54F, 0xFF4DB6AC};
 
     private Ui() {}

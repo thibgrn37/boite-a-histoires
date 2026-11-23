@@ -93,6 +93,8 @@ Au démarrage ou au réveil de l'écran, on arrive directement sur l'appli. Pour
   - **Épisodes gardés** : c'est le nombre d'épisodes les plus récents gardés sur le téléphone (30 par défaut). Ceux qui disparaissent du flux sont conservés quand même.
   - **Épisodes par jour** : au-delà, la lecture s'arrête, une lune s'affiche et l'enfant ne peut pas relancer. Ça repart à zéro chaque jour à minuit, ou avec le bouton « Remettre le compteur à zéro ».
   - **Luminosité** : l'appli garde toujours la luminosité choisie.
+  - **Mode nuit** : le soir (19 h à 7 h par défaut, réglable), les écrans de l'enfant passent sur fond noir. On peut aussi forcer « Toujours jour » ou « Toujours nuit ».
+  - **Écran qui s'assombrit** : sans toucher (30 s par défaut), l'écran devient très sombre et le son continue. Un toucher le rallume ; ce premier toucher n'appuie sur aucun bouton. Pendant la lecture, l'écran ne s'éteint plus complètement.
   - Tu y trouves aussi le **volume maximum**, le bouton **« Mettre à jour maintenant »** et **« Quitter le mode kiosque »**.
 - Les épisodes se téléchargent tout seuls toutes les 6 heures quand le téléphone est en Wi-Fi. Ensuite, tout marche hors ligne (dans la voiture par exemple).
 - Pour **éteindre** : appui long sur le bouton marche/arrêt.

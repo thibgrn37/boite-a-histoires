@@ -70,6 +70,8 @@ public final class Net {
 
     /** Télécharge dans un fichier .part puis renomme : un fichier présent est toujours complet. */
     public static void download(String url, File dest, AtomicBoolean stop) throws IOException {
+        File dir = dest.getParentFile();
+        if (dir != null && !dir.isDirectory()) dir.mkdirs();
         File tmp = new File(dest.getPath() + ".part");
         HttpURLConnection c = open(url);
         try {

@@ -31,6 +31,7 @@ final class ParentScreen {
         a = act;
         scroll = new ScrollView(a);
         scroll.setFillViewport(true);
+        scroll.setBackgroundColor(Ui.CREAM);
         LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
         int p = Ui.dp(a, 16);
@@ -115,6 +116,51 @@ final class ParentScreen {
         });
         lum.addView(lsb, Ui.lpMargins(a, ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(a, 48), 0, 4, 0, 0));
         lum.addView(small("Tout à gauche = luminosité normale du téléphone. Sinon, l'appli garde toujours cette luminosité."));
+
+        // Jour / nuit
+        LinearLayout nuit = section(col, "Mode nuit (fond noir)");
+        final TextView modeTv = Ui.text(a, "", 16, Ui.DARK, true);
+        nuit.addView(modeTv);
+        LinearLayout modes = new LinearLayout(a);
+        final String[] modeNames = {"Selon l'heure", "Toujours jour", "Toujours nuit"};
+        for (int i = 0; i < 3; i++) {
+            final int m = i;
+            Button b = Ui.button(a, modeNames[i], Ui.BLUE);
+            b.setTextSize(14);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { Store.setNightMode(m); modeTv.setText(nightText()); a.applyTheme(); }
+            });
+            modes.addView(b, Ui.lpMargins(a, 0, ViewGroup.LayoutParams.WRAP_CONTENT, i == 0 ? 0 : 4, 6, 0, 6));
+            ((LinearLayout.LayoutParams) b.getLayoutParams()).weight = 1;
+        }
+        nuit.addView(modes);
+        modeTv.setText(nightText());
+        final TextView startTv = Ui.text(a, "", 15, Ui.DARK, false);
+        final TextView endTv = Ui.text(a, "", 15, Ui.DARK, false);
+        startTv.setText("Nuit à partir de " + Store.nightStart() + " h");
+        endTv.setText("Jour à partir de " + Store.nightEnd() + " h");
+        nuit.addView(stepperTv(startTv, new Runnable() {
+            @Override public void run() { Store.setNightStart(Store.nightStart() - 1); startTv.setText("Nuit à partir de " + Store.nightStart() + " h"); modeTv.setText(nightText()); }
+        }, new Runnable() {
+            @Override public void run() { Store.setNightStart(Store.nightStart() + 1); startTv.setText("Nuit à partir de " + Store.nightStart() + " h"); modeTv.setText(nightText()); }
+        }));
+        nuit.addView(stepperTv(endTv, new Runnable() {
+            @Override public void run() { Store.setNightEnd(Store.nightEnd() - 1); endTv.setText("Jour à partir de " + Store.nightEnd() + " h"); modeTv.setText(nightText()); }
+        }, new Runnable() {
+            @Override public void run() { Store.setNightEnd(Store.nightEnd() + 1); endTv.setText("Jour à partir de " + Store.nightEnd() + " h"); modeTv.setText(nightText()); }
+        }));
+        nuit.addView(small("Le soir, les écrans de l'enfant passent sur fond noir pour ne pas éblouir."));
+
+        // Assombrissement
+        LinearLayout veille = section(col, "Écran qui s'assombrit");
+        final TextView dimTv = Ui.text(a, "", 15, Ui.DARK, false);
+        dimTv.setText(dimText());
+        veille.addView(stepperTv(dimTv, new Runnable() {
+            @Override public void run() { Store.setDimDelay(prevDim(Store.dimDelay())); dimTv.setText(dimText()); }
+        }, new Runnable() {
+            @Override public void run() { Store.setDimDelay(nextDim(Store.dimDelay())); dimTv.setText(dimText()); }
+        }));
+        veille.addView(small("Sans toucher l'écran, il devient très sombre ; le son continue. Un toucher le rallume (ce toucher n'appuie sur aucun bouton). Pendant la lecture, l'écran ne s'éteint plus complètement."));
 
         // Volume
         LinearLayout vol = section(col, "Volume maximum");
@@ -397,6 +443,41 @@ final class ParentScreen {
     private static String limitText() {
         int l = Store.episodeLimit();
         return l == 0 ? "Pas de limite" : l + " épisode" + (l > 1 ? "s" : "") + " par jour";
+    }
+
+    private static final int[] DIMS = {0, 15, 30, 60, 120, 300};
+    private static int nextDim(int v) { for (int d : DIMS) if (d > v) return d; return DIMS[DIMS.length - 1]; }
+    private static int prevDim(int v) { int r = 0; for (int d : DIMS) if (d < v) r = d; return r; }
+    private static String dimText() {
+        int d = Store.dimDelay();
+        if (d == 0) return "Jamais";
+        return "Après " + (d < 60 ? d + " secondes" : (d / 60) + " minute" + (d >= 120 ? "s" : ""));
+    }
+    private static String nightText() {
+        switch (Store.nightMode()) {
+            case 1: return "Toujours en mode jour";
+            case 2: return "Toujours en mode nuit";
+            default: return "Selon l'heure : nuit de " + Store.nightStart() + " h à " + Store.nightEnd() + " h"
+                    + (Store.isNightNow() ? " (c'est la nuit)" : " (c'est le jour)");
+        }
+    }
+
+    private View stepperTv(TextView label, final Runnable minus, final Runnable plus) {
+        LinearLayout r = new LinearLayout(a);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setPadding(0, Ui.dp(a, 6), 0, 0);
+        r.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        Button m = Ui.button(a, "−", Ui.BLUE);
+        m.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { minus.run(); }
+        });
+        Button p = Ui.button(a, "+", Ui.BLUE);
+        p.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { plus.run(); }
+        });
+        r.addView(m, Ui.lpMargins(a, Ui.dp(a, 56), Ui.dp(a, 44), 4, 0, 4, 0));
+        r.addView(p, Ui.lpMargins(a, Ui.dp(a, 56), Ui.dp(a, 44), 4, 0, 0, 0));
+        return r;
     }
 
     private View stepper(String label, final Runnable minus, final Runnable plus) {
