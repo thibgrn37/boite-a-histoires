@@ -174,30 +174,43 @@ public final class Sync {
         return null;
     }
 
-    /** Ajoute une fois les podcasts proposés par défaut : flux direct, sinon lien Apple, sinon recherche du nom. */
+    /** Podcasts ajoutés automatiquement : nom, flux officiel, lien Apple de secours (ou ""). */
+    static final String[][] DEFAULTS = {
+        {"Les aventures du professeur Caillou",
+         "https://radiofrance-podcast.net/podcast09/podcast_9cfc0cf4-6d0d-4ffa-a327-0c099c366d3c.xml",
+         "https://podcasts.apple.com/fr/podcast/les-aventures-du-professeur-caillou/id1811582936"},
+        {"Les Odyssées", "https://radiofrance-podcast.net/podcast09/rss_20108.xml", ""},
+        {"Une histoire et... Oli", "https://radiofrance-podcast.net/podcast09/rss_19721.xml", ""},
+        {"Encore une histoire", "https://access.acast.com/rss/670d1795df4dd6f896655670/",
+         "https://podcasts.apple.com/fr/podcast/encore-une-histoire/id1463322273"},
+    };
+
+    /** Ajoute une fois chaque podcast proposé par défaut (flux direct, sinon lien Apple). */
     static void seedDefaults() {
-        String[][] wanted = {{"Les aventures du professeur Caillou", "caillou",
-                "https://radiofrance-podcast.net/podcast09/podcast_9cfc0cf4-6d0d-4ffa-a327-0c099c366d3c.xml",
-                "https://podcasts.apple.com/fr/podcast/les-aventures-du-professeur-caillou/id1811582936"}};
-        for (String[] w : wanted) {
-            String key = "seed3_" + Store.hash(w[0]);
-            if (Store.flag(key)) continue;
-            boolean present = false;
+        // 1.5 à 1.7 avaient trouvé un autre podcast (« professeur cailloux ») : on le retire.
+        if (!Store.flag("cailloux_retire")) {
             for (Store.Podcast p : Store.podcasts()) {
-                if (p.feedUrl.contains("9cfc0cf4-6d0d-4ffa-a327-0c099c366d3c")) present = true;
-                else if (p.name.toLowerCase().contains("cailloux")) {
-                    // 1.5 à 1.7 avaient trouvé un autre podcast (« professeur cailloux ») : on le retire.
+                if (p.name.toLowerCase().contains("cailloux")) {
                     Store.removePodcast(p.id);
                     Store.log("Mauvais podcast « " + p.name + " » retiré");
                 }
             }
+            Store.setFlag("cailloux_retire");
+        }
+        for (String[] w : DEFAULTS) {
+            String key = "seed4_" + Store.hash(w[1]);
+            if (Store.flag(key)) continue;
+            boolean present = false;
+            for (Store.Podcast p : Store.podcasts()) if (p.feedUrl.equals(w[1]) || Net.norm(p.name).equals(Net.norm(w[0]))) present = true;
             if (present) { Store.setFlag(key); continue; }
             FeedParser.Feed f = null;
             String feed = null;
             for (int attempt = 0; attempt < 2 && f == null; attempt++) {
+                if (attempt == 1 && w[2].isEmpty()) break;
                 try {
-                    feed = attempt == 0 ? w[2] : Net.resolveFeed(w[3], "");
+                    feed = attempt == 0 ? w[1] : Net.resolveFeed(w[2], "");
                     f = FeedParser.parse(Net.bytes(feed));
+                    if (f.items.isEmpty()) throw new java.io.IOException("aucun épisode");
                     Store.log("« " + w[0] + " » : flux lu " + feed);
                 } catch (Throwable ex) {
                     f = null;
