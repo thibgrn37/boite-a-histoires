@@ -97,6 +97,7 @@ Au démarrage ou au réveil de l'écran, on arrive directement sur l'appli. Pour
   - **Écran qui s'assombrit** : sans toucher (30 s par défaut), l'écran devient très sombre et le son continue. Un toucher le rallume ; ce premier toucher n'appuie sur aucun bouton. Pendant la lecture, l'écran ne s'éteint plus complètement.
   - Tu y trouves aussi le **volume maximum**, le bouton **« Mettre à jour maintenant »** et **« Quitter le mode kiosque »**.
 - Les épisodes se téléchargent tout seuls toutes les 6 heures quand le téléphone est en Wi-Fi. Ensuite, tout marche hors ligne (dans la voiture par exemple).
+- En haut de l'écran d'accueil, une petite **pile** montre la batterie : verte, orange sous 35 %, rouge sous 15 % (éclair quand il est branché).
 - Pour **éteindre** : appui long sur le bouton marche/arrêt.
 
 ## 6. Secours : code oublié

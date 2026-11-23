@@ -62,6 +62,21 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
 
     private ParentScreen parent;
 
+    // batterie (écran d'accueil)
+    private BatteryView battery;
+    private final android.content.BroadcastReceiver batteryReceiver = new android.content.BroadcastReceiver() {
+        @Override public void onReceive(android.content.Context c, Intent i) { updateBattery(i); }
+    };
+
+    private void updateBattery(Intent i) {
+        if (battery == null || i == null) return;
+        int lvl = i.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1);
+        int scale = i.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100);
+        int st = i.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1);
+        boolean ch = st == android.os.BatteryManager.BATTERY_STATUS_CHARGING || st == android.os.BatteryManager.BATTERY_STATUS_FULL;
+        if (lvl >= 0 && scale > 0) battery.set(lvl * 100 / scale, ch);
+    }
+
     private int ticks = 0;
 
     private final Runnable tick = new Runnable() {
@@ -108,6 +123,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         VolumeCap.enforce(this);
         onLibraryChanged();
         handler.post(tick);
+        updateBattery(registerReceiver(batteryReceiver, new android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED)));
     }
 
     @Override
@@ -117,6 +133,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         player.removeListener(this);
         handler.removeCallbacks(tick);
         handler.removeCallbacks(dimTask);
+        try { unregisterReceiver(batteryReceiver); } catch (Exception ignored) { }
     }
 
     @Override
@@ -387,6 +404,12 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
             }
         });
         header.addView(secret, new FrameLayout.LayoutParams(Ui.dp(this, 96), Ui.dp(this, 96), Gravity.END | Gravity.CENTER_VERTICAL));
+        battery = new BatteryView(this);
+        FrameLayout.LayoutParams blp = new FrameLayout.LayoutParams(Ui.dp(this, 100), Ui.dp(this, 40), Gravity.END | Gravity.CENTER_VERTICAL);
+        // Posée sur la zone secrète : elle ne capte pas les appuis, l'appui long marche toujours.
+        blp.setMargins(0, 0, Ui.dp(this, 10), 0);
+        header.addView(battery, blp);
+        updateBattery(registerReceiver(null, new android.content.IntentFilter(Intent.ACTION_BATTERY_CHANGED)));
         col.addView(header, Ui.lp(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 96)));
 
         FrameLayout body = new FrameLayout(this);
