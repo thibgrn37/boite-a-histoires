@@ -1,0 +1,12 @@
+<resources>
+    <color name="cream">#FFFFF3E0</color>
+    <color name="icon_bg">#FFFF8A65</color>
+    <style name="AppTheme" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/cream</item>
+        <item name="android:statusBarColor">@color/cream</item>
+        <item name="android:navigationBarColor">@color/cream</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:colorAccent">#FFFF7043</item>
+        <item name="android:colorPrimary">#FFFF7043</item>
+    </style>
+</resources>
