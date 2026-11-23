@@ -230,20 +230,30 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         title.setPadding(Ui.dp(this, 20), 0, 0, 0);
         header.addView(title, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT, Gravity.START | Gravity.CENTER_VERTICAL));
 
-        // Coin secret : appui long de 3 secondes en haut à droite.
-        View secret = new View(this);
+        // Cadenas discret en haut à droite : appui long de 3 secondes pour l'espace parents.
+        final ImageView secret = new ImageView(this);
+        secret.setImageResource(R.drawable.ic_lock);
+        secret.setImageTintList(ColorStateList.valueOf(Ui.GREY));
+        secret.setAlpha(0.25f);
+        int sp = Ui.dp(this, 26);
+        secret.setPadding(sp, sp, sp, sp);
         secret.setOnTouchListener(new View.OnTouchListener() {
             final Runnable open = new Runnable() {
-                @Override public void run() { showCode(); }
+                @Override public void run() { secret.setAlpha(0.25f); showCode(); }
             };
             @Override public boolean onTouch(View v, MotionEvent e) {
-                if (e.getAction() == MotionEvent.ACTION_DOWN) handler.postDelayed(open, 3000);
-                else if (e.getAction() == MotionEvent.ACTION_UP || e.getAction() == MotionEvent.ACTION_CANCEL) handler.removeCallbacks(open);
+                if (e.getAction() == MotionEvent.ACTION_DOWN) {
+                    secret.setAlpha(0.8f);
+                    handler.postDelayed(open, 3000);
+                } else if (e.getAction() == MotionEvent.ACTION_UP || e.getAction() == MotionEvent.ACTION_CANCEL) {
+                    secret.setAlpha(0.25f);
+                    handler.removeCallbacks(open);
+                }
                 return true;
             }
         });
-        header.addView(secret, new FrameLayout.LayoutParams(Ui.dp(this, 90), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.END));
-        col.addView(header, Ui.lp(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 80)));
+        header.addView(secret, new FrameLayout.LayoutParams(Ui.dp(this, 96), Ui.dp(this, 96), Gravity.END | Gravity.CENTER_VERTICAL));
+        col.addView(header, Ui.lp(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 96)));
 
         FrameLayout body = new FrameLayout(this);
         grid = makeGrid(170);

@@ -106,7 +106,7 @@ final class ParentScreen {
         LinearLayout code = section(col, "Code parent");
         final EditText codeEt = edit("Nouveau code (4 à 8 chiffres)", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
         code.addView(codeEt);
-        final TextView codeRes = small("Pour ouvrir cet espace : appui long (3 s) en haut à droite de l'écran d'accueil.");
+        final TextView codeRes = small("Pour ouvrir cet espace : appui long (3 s) sur le petit cadenas en haut à droite de l'écran d'accueil.");
         Button codeBtn = Ui.button(a, "Changer le code", Ui.BLUE);
         codeBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
