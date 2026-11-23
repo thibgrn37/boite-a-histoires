@@ -98,6 +98,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         dismissKeyguard();
         if (screen != PARENT) Kiosk.sync(this);
         applyImmersive();
+        applyBrightness();
         VolumeCap.enforce(this);
         onLibraryChanged();
         handler.post(tick);
@@ -161,6 +162,46 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         } catch (Exception ignored) { }
     }
 
+    /** Luminosité imposée par le parent (0 = réglage normal du téléphone). */
+    void applyBrightness() {
+        android.view.WindowManager.LayoutParams lp = getWindow().getAttributes();
+        int b = Store.brightness();
+        lp.screenBrightness = b <= 0 ? android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE : b / 100f;
+        getWindow().setAttributes(lp);
+    }
+
+    private View sleepOverlay;
+
+    /** « Dodo » : la limite d'épisodes du jour est atteinte. */
+    void showSleep() {
+        if (sleepOverlay != null && sleepOverlay.getParent() != null) return;
+        LinearLayout ov = new LinearLayout(this);
+        ov.setOrientation(LinearLayout.VERTICAL);
+        ov.setGravity(Gravity.CENTER);
+        ov.setBackgroundColor(0xEE1A237E);
+        ov.setClickable(true);
+        ImageView moon = new ImageView(this);
+        moon.setImageResource(R.drawable.ic_moon);
+        moon.setImageTintList(ColorStateList.valueOf(0xFFFFE082));
+        ov.addView(moon, new LinearLayout.LayoutParams(Ui.dp(this, 200), Ui.dp(this, 200)));
+        TextView t = Ui.text(this, "C'est fini pour aujourd'hui !", 22, Ui.WHITE, true);
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(0, Ui.dp(this, 24), 0, 0);
+        ov.addView(t);
+        ov.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { root.removeView(sleepOverlay); sleepOverlay = null; }
+        });
+        root.addView(ov, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        sleepOverlay = ov;
+    }
+
+    void tapPlay() {
+        if (!player.isActive() && Store.limitReached()) { showSleep(); return; }
+        player.toggle();
+    }
+
+    private boolean wasActive = false;
+
     void applyImmersive() {
         boolean hide = Store.kiosk();
         if (Build.VERSION.SDK_INT >= 30) {
@@ -202,6 +243,9 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
 
     @Override
     public void onPlayerChanged() {
+        boolean active = player.isActive();
+        if (wasActive && !active && Store.limitReached() && screen != PARENT) showSleep();
+        wasActive = active;
         updateMini();
         if (screen == PLAYER) updatePlayer();
         if (screen == EPISODES && gridAdapter != null) gridAdapter.notifyDataSetChanged();
@@ -376,6 +420,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         grid.setAdapter(gridAdapter);
         grid.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override public void onItemClick(AdapterView<?> a, View v, int pos, long id) {
+                if (Store.limitReached()) { showSleep(); return; }
                 player.play(new ArrayList<>(epList), pos);
                 showPlayer();
             }
@@ -421,7 +466,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         bar.addView(miniTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         miniPlay = Ui.roundButton(this, R.drawable.ic_play, Ui.GREEN, 76);
         miniPlay.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { player.toggle(); }
+            @Override public void onClick(View v) { tapPlay(); }
         });
         bar.addView(miniPlay);
         bar.setOnClickListener(new View.OnClickListener() {
@@ -476,7 +521,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         plImg.setClipToOutline(true);
         plImg.setElevation(Ui.dp(this, 8));
         plImg.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { player.toggle(); }
+            @Override public void onClick(View v) { tapPlay(); }
         });
         col.addView(plImg, new LinearLayout.LayoutParams(size, size));
 
@@ -503,7 +548,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
             @Override public void onClick(View v) { player.previous(); }
         });
         plPlay.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { player.toggle(); }
+            @Override public void onClick(View v) { tapPlay(); }
         });
         plNext.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { player.next(); }
@@ -530,7 +575,8 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
             plTitle.setText(e.title);
             Images.load(plImg, Store.displayImage(e), Ui.dp(this, 400));
         }
-        plPlay.setImageResource(player.isActive() ? R.drawable.ic_pause : R.drawable.ic_play);
+        plPlay.setImageResource(Store.limitReached() && !player.isActive() ? R.drawable.ic_moon
+                : (player.isActive() ? R.drawable.ic_pause : R.drawable.ic_play));
         plPrev.setAlpha(player.hasPrevious() ? 1f : 0.35f);
         plNext.setAlpha(player.hasNext() ? 1f : 0.35f);
         updateProgress();

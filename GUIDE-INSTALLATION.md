@@ -91,6 +91,8 @@ Au démarrage ou au réveil de l'écran, on arrive directement sur l'appli. Pour
   - **Ajouter un podcast** : donne un nom et un lien (flux RSS ou lien Apple Podcasts). Avec juste le nom, l'appli le cherche sur Apple Podcasts. Le téléchargement démarre tout de suite.
   - **Passer le début** : c'est le nombre de secondes de jingle à sauter, réglable pour chaque podcast (Les Bestioles : 6 s au départ).
   - **Épisodes gardés** : c'est le nombre d'épisodes les plus récents gardés sur le téléphone (30 par défaut). Ceux qui disparaissent du flux sont conservés quand même.
+  - **Épisodes par jour** : au-delà, la lecture s'arrête, une lune s'affiche et l'enfant ne peut pas relancer. Ça repart à zéro chaque jour à minuit, ou avec le bouton « Remettre le compteur à zéro ».
+  - **Luminosité** : l'appli garde toujours la luminosité choisie.
   - Tu y trouves aussi le **volume maximum**, le bouton **« Mettre à jour maintenant »** et **« Quitter le mode kiosque »**.
 - Les épisodes se téléchargent tout seuls toutes les 6 heures quand le téléphone est en Wi-Fi. Ensuite, tout marche hors ligne (dans la voiture par exemple).
 - Pour **éteindre** : appui long sur le bouton marche/arrêt.

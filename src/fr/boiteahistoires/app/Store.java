@@ -416,6 +416,24 @@ public final class Store {
     public static boolean flag(String k) { return prefs.getBoolean(k, false); }
     public static void setFlag(String k) { prefs.edit().putBoolean(k, true).apply(); }
 
+    // Limite d'épisodes par jour (0 = illimité) et luminosité imposée (0 = réglage du téléphone)
+    public static int episodeLimit() { return prefs.getInt("limite", 0); }
+    public static void setEpisodeLimit(int n) { prefs.edit().putInt("limite", Math.max(0, Math.min(50, n))).apply(); changed(); }
+    private static String today() { return new java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(new java.util.Date()); }
+    public static int playedToday() {
+        if (!today().equals(prefs.getString("ecoutes_jour", ""))) return 0;
+        return prefs.getInt("ecoutes", 0);
+    }
+    public static void addPlayed() {
+        prefs.edit().putString("ecoutes_jour", today()).putInt("ecoutes", playedToday() + 1).apply();
+        changed();
+    }
+    public static void resetPlayed() { prefs.edit().putString("ecoutes_jour", today()).putInt("ecoutes", 0).apply(); changed(); }
+    public static boolean limitReached() { int l = episodeLimit(); return l > 0 && playedToday() >= l; }
+
+    public static int brightness() { return prefs.getInt("luminosite", 0); }
+    public static void setBrightness(int b) { prefs.edit().putInt("luminosite", b).apply(); }
+
     public static boolean firstRunDone() { return prefs.getBoolean("init", false); }
     public static void setFirstRunDone() { prefs.edit().putBoolean("init", true).apply(); }
 }

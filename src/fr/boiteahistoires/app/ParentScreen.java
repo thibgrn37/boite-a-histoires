@@ -22,7 +22,7 @@ import java.util.Locale;
 final class ParentScreen {
     private final MainActivity a;
     private final ScrollView scroll;
-    private TextView logTv, updTv, statusTv, lastTv, spaceTv, addResult, kioskInfo, batteryTv;
+    private TextView playedTv, logTv, updTv, statusTv, lastTv, spaceTv, addResult, kioskInfo, batteryTv;
     private LinearLayout podcastsBox;
     private Button kioskBtn, settingsBtn, batteryBtn, releaseBtn, addBtn;
     private boolean adding = false;
@@ -81,6 +81,40 @@ final class ParentScreen {
 
         // Podcasts
         podcastsBox = section(col, "Mes podcasts");
+
+        // Limite d'épisodes
+        LinearLayout lim = section(col, "Épisodes par jour");
+        final TextView limTv = Ui.text(a, "", 16, Ui.DARK, true);
+        lim.addView(stepper2(limTv));
+        playedTv = small("");
+        lim.addView(playedTv);
+        lim.addView(small("Quand la limite est atteinte, la lecture s'arrête et une lune s'affiche ; impossible de relancer. Le compteur repart à zéro chaque jour à minuit."));
+        Button resetBtn = Ui.button(a, "Remettre le compteur à zéro", Ui.BLUE);
+        resetBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { Store.resetPlayed(); refresh(); }
+        });
+        lim.addView(resetBtn, Ui.lpMargins(a, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 8, 0, 0));
+
+        // Luminosité
+        LinearLayout lum = section(col, "Luminosité de l'écran");
+        final TextView lumTv = Ui.text(a, "", 16, Ui.DARK, true);
+        lum.addView(lumTv);
+        SeekBar lsb = new SeekBar(a);
+        lsb.setMax(100);
+        lsb.setProgress(Store.brightness());
+        lumTv.setText(Store.brightness() == 0 ? "Réglage du téléphone" : Store.brightness() + " %");
+        lsb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar s, int v, boolean user) {
+                int val = v == 0 ? 0 : Math.max(3, v);
+                lumTv.setText(val == 0 ? "Réglage du téléphone" : val + " %");
+                Store.setBrightness(val);
+                a.applyBrightness();
+            }
+            @Override public void onStartTrackingTouch(SeekBar s) { }
+            @Override public void onStopTrackingTouch(SeekBar s) { }
+        });
+        lum.addView(lsb, Ui.lpMargins(a, ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(a, 48), 0, 4, 0, 0));
+        lum.addView(small("Tout à gauche = luminosité normale du téléphone. Sinon, l'appli garde toujours cette luminosité."));
 
         // Volume
         LinearLayout vol = section(col, "Volume maximum");
@@ -239,6 +273,7 @@ final class ParentScreen {
     }
 
     void refresh() {
+        playedTv.setText("Écoutés aujourd'hui : " + Store.playedToday());
         String j = Store.journal();
         logTv.setText(j.isEmpty() ? "Rien pour l'instant." : j);
         String us = Store.updateStatus();
@@ -339,6 +374,29 @@ final class ParentScreen {
             row.addView(sep, Ui.lpMargins(a, ViewGroup.LayoutParams.MATCH_PARENT, 1, 0, 12, 0, 0));
             podcastsBox.addView(row);
         }
+    }
+
+    private View stepper2(final TextView label) {
+        label.setText(limitText());
+        LinearLayout r = new LinearLayout(a);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        Button m = Ui.button(a, "−", Ui.BLUE);
+        m.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { Store.setEpisodeLimit(Store.episodeLimit() - 1); label.setText(limitText()); }
+        });
+        Button p = Ui.button(a, "+", Ui.BLUE);
+        p.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { Store.setEpisodeLimit(Store.episodeLimit() + 1); label.setText(limitText()); }
+        });
+        r.addView(m, Ui.lpMargins(a, Ui.dp(a, 56), Ui.dp(a, 44), 4, 0, 4, 0));
+        r.addView(p, Ui.lpMargins(a, Ui.dp(a, 56), Ui.dp(a, 44), 4, 0, 0, 0));
+        return r;
+    }
+
+    private static String limitText() {
+        int l = Store.episodeLimit();
+        return l == 0 ? "Pas de limite" : l + " épisode" + (l > 1 ? "s" : "") + " par jour";
     }
 
     private View stepper(String label, final Runnable minus, final Runnable plus) {

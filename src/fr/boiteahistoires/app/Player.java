@@ -235,6 +235,7 @@ public final class Player implements MediaPlayer.OnPreparedListener, MediaPlayer
     }
 
     private void startInternal() {
+        if (Store.limitReached()) { wantPlay = false; fire(); return; }
         if (!requestFocus()) { fire(); return; }
         VolumeCap.enforce(ctx);
         try { mp.start(); } catch (Exception e) { Log.e(Store.TAG, "start", e); }
@@ -264,8 +265,9 @@ public final class Player implements MediaPlayer.OnPreparedListener, MediaPlayer
         if (e != null) {
             Store.setPosition(e.id, 0);
             Store.setDone(e.id, true);
+            Store.addPlayed();
         }
-        if (hasNext()) {
+        if (hasNext() && !Store.limitReached()) {
             index++;
             load(true);
         } else {
