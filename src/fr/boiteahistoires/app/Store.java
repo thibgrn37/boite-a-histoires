@@ -32,7 +32,7 @@ public final class Store {
     }
 
     public static final class Episode {
-        public String id, podcastId, guid, title, audioUrl, imageUrl;
+        public String id, podcastId, guid, title, audioUrl, imageUrl, pageUrl, pageImage;
         public long pubDate;
         public int order;
     }
@@ -102,6 +102,8 @@ public final class Store {
                 e.imageUrl = o.has("img") ? o.optString("img", null) : null;
                 e.pubDate = o.optLong("date", 0);
                 e.order = o.optInt("ord", 0);
+                e.pageUrl = o.has("page") ? o.optString("page", null) : null;
+                e.pageImage = o.has("pimg") ? o.optString("pimg", null) : null;
                 episodes.add(e);
             }
         } catch (Exception ex) {
@@ -135,6 +137,8 @@ public final class Store {
                 if (e.imageUrl != null) o.put("img", e.imageUrl);
                 o.put("date", e.pubDate);
                 o.put("ord", e.order);
+                if (e.pageUrl != null) o.put("page", e.pageUrl);
+                if (e.pageImage != null) o.put("pimg", e.pageImage);
                 ea.put(o);
             }
             root.put("podcasts", pa);
@@ -335,11 +339,18 @@ public final class Store {
                 if (it.imageUrl != null) found.imageUrl = it.imageUrl;
                 if (it.pubDate > 0) found.pubDate = it.pubDate;
                 found.order = i;
+                if (it.pageUrl != null) found.pageUrl = it.pageUrl;
             }
             save();
         }
         changed();
         return added;
+    }
+
+    /** Mémorise l'image trouvée sur la page web de l'épisode ("" = rien trouvé). */
+    public static synchronized void setPageImage(String eid, String url) {
+        for (Episode e : episodes) if (e.id.equals(eid)) { e.pageImage = url == null ? "" : url; break; }
+        save();
     }
 
     // ---------------------------------------------------------------- positions de lecture
@@ -379,6 +390,9 @@ public final class Store {
     public static void setLastUpdateCheck(long t) { prefs.edit().putLong("maj_verif", t).apply(); }
     public static String updateStatus() { return prefs.getString("maj_statut", ""); }
     public static void setUpdateStatus(String s) { prefs.edit().putString("maj_statut", s).apply(); changed(); }
+
+    public static boolean flag(String k) { return prefs.getBoolean(k, false); }
+    public static void setFlag(String k) { prefs.edit().putBoolean(k, true).apply(); }
 
     public static boolean firstRunDone() { return prefs.getBoolean("init", false); }
     public static void setFirstRunDone() { prefs.edit().putBoolean("init", true).apply(); }

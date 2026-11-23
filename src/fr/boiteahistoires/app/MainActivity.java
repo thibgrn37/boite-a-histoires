@@ -232,8 +232,6 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
 
         // Cadenas discret en haut à droite : appui long de 3 secondes pour l'espace parents.
         final ImageView secret = new ImageView(this);
-        secret.setImageResource(R.drawable.ic_lock);
-        secret.setImageTintList(ColorStateList.valueOf(Ui.GREY));
         secret.setAlpha(0.25f);
         int sp = Ui.dp(this, 26);
         secret.setPadding(sp, sp, sp, sp);

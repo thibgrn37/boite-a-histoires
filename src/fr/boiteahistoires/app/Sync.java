@@ -51,6 +51,7 @@ public final class Sync {
     /** @return true si tout a été traité. */
     static boolean runAll(AtomicBoolean stop) {
         boolean ok = true;
+        seedDefaults();
         do {
             again = false;
             List<Store.Podcast> list = Store.podcasts();
@@ -96,8 +97,11 @@ public final class Sync {
             if (stop.get()) return true;
             Store.Episode e = eps.get(i);
             if (Store.podcast(p.id) == null) return true;
-            if (e.imageUrl != null && !e.imageUrl.equals(p.imageUrl) && !Store.image(e).exists()) {
-                try { Net.download(e.imageUrl, Store.image(e), stop); } catch (Exception ex) { Log.w(Store.TAG, "image", ex); }
+            if (!Store.image(e).exists()) {
+                String img = episodeImage(e, p);
+                if (img != null) {
+                    try { Net.download(img, Store.image(e), stop); } catch (Exception ex) { Log.w(Store.TAG, "image", ex); }
+                }
             }
             File a = Store.audio(e);
             if (a.exists()) continue;
@@ -121,6 +125,49 @@ public final class Sync {
         }
         Store.changed();
         return true;
+    }
+
+    private static final java.util.regex.Pattern OG_IMAGE = java.util.regex.Pattern.compile(
+            "<meta[^>]+(?:property|name)=[\"'](?:og:image|twitter:image)[\"'][^>]*content=[\"']([^\"']+)[\"']"
+            + "|<meta[^>]+content=[\"']([^\"']+)[\"'][^>]*(?:property|name)=[\"'](?:og:image|twitter:image)[\"']",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /** Image propre à l'épisode : celle du flux, sinon celle de sa page web (og:image). */
+    static String episodeImage(Store.Episode e, Store.Podcast p) {
+        if (e.imageUrl != null && !e.imageUrl.equals(p.imageUrl)) return e.imageUrl;
+        if (e.pageImage == null && e.pageUrl != null) {
+            String found = "";
+            try {
+                String html = Net.text(e.pageUrl);
+                java.util.regex.Matcher m = OG_IMAGE.matcher(html);
+                if (m.find()) found = (m.group(1) != null ? m.group(1) : m.group(2)).replace("&amp;", "&");
+            } catch (Exception ex) {
+                Log.w(Store.TAG, "page épisode", ex);
+                return null; // on réessaiera plus tard
+            }
+            Store.setPageImage(e.id, found);
+            e.pageImage = found;
+        }
+        if (e.pageImage != null && !e.pageImage.isEmpty() && !e.pageImage.equals(p.imageUrl)) return e.pageImage;
+        return null;
+    }
+
+    /** Ajoute une fois les podcasts proposés par défaut (cherchés par leur nom sur Apple Podcasts). */
+    static void seedDefaults() {
+        String[] names = {"Les aventures du professeur Caillou"};
+        for (String n : names) {
+            String key = "seed_" + Store.hash(n);
+            if (Store.flag(key)) continue;
+            try {
+                String feed = Net.resolveFeed("", n);
+                FeedParser.Feed f = FeedParser.parse(Net.bytes(feed));
+                Store.Podcast p = Store.addPodcast(f.title.isEmpty() ? n : f.title, feed, f.imageUrl, 0);
+                if (p != null) Store.mergeEpisodes(p.id, f.items);
+                Store.setFlag(key);
+            } catch (Exception ex) {
+                Log.w(Store.TAG, "ajout " + n, ex);
+            }
+        }
     }
 
     static String lastSyncText() {

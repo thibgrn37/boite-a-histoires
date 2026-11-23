@@ -14,7 +14,7 @@ import java.util.Locale;
 public final class FeedParser {
 
     public static final class Item {
-        public String guid, title, audioUrl, imageUrl;
+        public String guid, title, audioUrl, imageUrl, pageUrl;
         public long pubDate;
     }
 
@@ -94,6 +94,8 @@ public final class FeedParser {
                         cur = null;
                     } else if ("title".equals(n)) {
                         if (cur.title == null || cur.title.isEmpty()) cur.title = t;
+                    } else if ("link".equals(n)) {
+                        if (cur.pageUrl == null && t.startsWith("http")) cur.pageUrl = t;
                     } else if ("guid".equals(n) || "id".equals(n)) {
                         if (!t.isEmpty()) cur.guid = t;
                     } else if ("pubDate".equals(n) || "published".equals(n) || "dc:date".equals(n)) {

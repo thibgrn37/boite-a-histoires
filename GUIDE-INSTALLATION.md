@@ -87,7 +87,7 @@ Au démarrage ou au réveil de l'écran, on arrive directement sur l'appli. Pour
 ## 5. Utilisation
 
 - **Enfant** : il touche l'image d'un podcast, puis l'image d'un épisode, et ça joue. Il y a 3 gros boutons : précédent, lecture/pause, suivant. La flèche orange sert à revenir en arrière. Un ✔ vert marque les épisodes déjà écoutés.
-- **Espace parents** : fais un **appui long de 3 secondes sur le petit cadenas gris en haut à droite** de l'écran d'accueil (la page avec les images des podcasts), puis tape le code **1234**. Pense à le changer.
+- **Espace parents** : fais un **appui long de 3 secondes tout en haut à droite** de l'écran d'accueil (la page avec les images des podcasts), à droite du titre « Boîte à histoires » (zone invisible), puis tape le code **1234**. Pense à le changer.
   - **Ajouter un podcast** : donne un nom et un lien (flux RSS ou lien Apple Podcasts). Avec juste le nom, l'appli le cherche sur Apple Podcasts. Le téléchargement démarre tout de suite.
   - **Passer le début** : c'est le nombre de secondes de jingle à sauter, réglable pour chaque podcast (Les Bestioles : 6 s au départ).
   - **Épisodes gardés** : c'est le nombre d'épisodes les plus récents gardés sur le téléphone (30 par défaut). Ceux qui disparaissent du flux sont conservés quand même.
