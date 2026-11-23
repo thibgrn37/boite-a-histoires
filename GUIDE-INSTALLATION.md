@@ -66,7 +66,7 @@ Ouvre ensuite l'appli : le téléphone est maintenant bloqué dessus. Il démarr
 **Si ça échoue :**
 - *« already some accounts on the device »* : va dans **Paramètres → Comptes** et supprime tous les comptes, puis relance la commande.
 - *« already several users »* : supprime le « Second espace » ou l'utilisateur invité, puis relance.
-- *« SecurityException … MANAGE_DEVICE_ADMINS »* ou *« Neither user 2000 … »* : c'est une particularité de Xiaomi, il faut l'option « Débogage USB (paramètres de sécurité) ». Voici comment faire :
+- *« SecurityException: Calling identity is not authorized »*, *« … MANAGE_DEVICE_ADMINS »* ou *« Neither user 2000 … »* : c'est une particularité de Xiaomi, il faut l'option « Débogage USB (paramètres de sécurité) ». Voici comment faire :
   1. Connecte temporairement un compte Xiaomi (Paramètres → Compte Xiaomi). Une carte SIM peut être demandée.
   2. Dans les Options pour les développeurs, active **« Débogage USB (paramètres de sécurité) »**.
   3. Déconnecte le compte Xiaomi (Paramètres → Compte Xiaomi → Se déconnecter), puis vérifie dans Paramètres → Comptes qu'il n'en reste aucun.
