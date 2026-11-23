@@ -72,6 +72,18 @@ Ouvre ensuite l'appli : le téléphone est maintenant bloqué dessus. Il démarr
   3. Déconnecte le compte Xiaomi (Paramètres → Compte Xiaomi → Se déconnecter), puis vérifie dans Paramètres → Comptes qu'il n'en reste aucun.
   4. Relance la commande `dpm set-device-owner`.
 
+### Sans compte Xiaomi : mode « épinglage » (solution de repli)
+
+Si `dpm set-device-owner` refuse et que tu ne veux pas de compte Xiaomi :
+
+1. Installe la nouvelle version : `./adb install -r ~/Downloads/BoiteAHistoires.apk`
+2. **Écran de verrouillage : aucun.** Va dans Paramètres → Mots de passe et sécurité → Verrouillage de l'écran → « Aucun » (si l'option existe), puis dans Paramètres → Écran de verrouillage → Veille → choisis un délai.
+3. **Appli d'accueil par défaut :** appuie sur le bouton Accueil. Si Android demande quelle appli utiliser, choisis « Boîte à histoires » puis « Toujours ». Sinon, va dans Paramètres → Applications → Applications par défaut → Écran d'accueil → Boîte à histoires.
+4. **Épinglage :** Paramètres → Mots de passe et sécurité → Confidentialité → Épinglage d'application → activé.
+5. Ouvre l'appli. Elle demande toute seule à s'épingler : réponds « Épingler ». Elle le redemande à chaque allumage du téléphone, et il suffit d'un appui.
+
+Au démarrage ou au réveil de l'écran, on arrive directement sur l'appli. Pour sortir sans code, fais un appui long simultané sur Retour + Aperçu. Pour installer une mise à jour dans ce mode, va dans l'espace parents et touche « Vérifier les mises à jour », puis confirme. La première fois, autorise « Installer des applis inconnues » pour Boîte à histoires.
+
 ## 5. Utilisation
 
 - **Enfant** : il touche l'image d'un podcast, puis l'image d'un épisode, et ça joue. Il y a 3 gros boutons : précédent, lecture/pause, suivant. La flèche orange sert à revenir en arrière. Un ✔ vert marque les épisodes déjà écoutés.
