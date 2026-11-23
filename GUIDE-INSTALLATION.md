@@ -107,7 +107,7 @@ Le code redevient 1234 et le mode kiosque est désactivé.
 
 ## 7. Mises à jour de l'appli (automatiques)
 
-Plus besoin du Mac : deux fois par jour en Wi-Fi, l'appli lit le fichier `version.json` de la dernière « release » du dépôt GitHub `thibgrn37/boite-a-histoires`. Si une version plus récente existe, elle la télécharge et l'installe toute seule, sans rien demander (grâce au mode « propriétaire de l'appareil »), puis se rouvre. Tu as aussi un bouton **« Vérifier les mises à jour »** dans l'espace parents.
+Plus besoin du Mac : deux fois par jour en Wi-Fi, l'appli lit le fichier `release/version.json` du dépôt GitHub `thibgrn37/boite-a-histoires`. Si une version plus récente existe, elle la télécharge et l'installe toute seule, sans rien demander (grâce au mode « propriétaire de l'appareil »), puis se rouvre. Tu as aussi un bouton **« Vérifier les mises à jour »** dans l'espace parents.
 
 Les nouvelles versions doivent être signées avec la **même clé** (`keystore/boite.keystore`, gardée à part, jamais publiée), sinon Android refuse l'installation.
 

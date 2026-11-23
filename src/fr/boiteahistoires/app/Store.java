@@ -368,7 +368,12 @@ public final class Store {
     public static long lastSync() { return prefs.getLong("derniere_maj", 0); }
     public static void setLastSync(long t) { prefs.edit().putLong("derniere_maj", t).apply(); }
 
-    public static String updateUrl() { return prefs.getString("maj_url", Updater.DEFAULT_URL); }
+    public static String updateUrl() {
+        String u = prefs.getString("maj_url", Updater.DEFAULT_URL);
+        // Ancienne adresse (releases GitHub) remplacée par le dossier release/ du dépôt.
+        if (u.contains("/releases/latest/download/")) u = Updater.DEFAULT_URL;
+        return u;
+    }
     public static void setUpdateUrl(String u) { prefs.edit().putString("maj_url", u == null ? "" : u.trim()).apply(); }
     public static long lastUpdateCheck() { return prefs.getLong("maj_verif", 0); }
     public static void setLastUpdateCheck(long t) { prefs.edit().putLong("maj_verif", t).apply(); }

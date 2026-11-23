@@ -12,4 +12,4 @@ mkdir -p release
 cp build/BoiteAHistoires.apk release/
 printf '{"versionCode": %s, "versionName": "%s", "apk": "BoiteAHistoires.apk"}\n' "$CODE" "$NAME" > release/version.json
 echo "Version $NAME ($CODE) prête dans release/ :"
-echo "  gh release create v$NAME release/BoiteAHistoires.apk release/version.json --title \"$NAME\""
+echo "  Copie release/ dans le dépôt, puis commit + push sur main : les téléphones se mettent à jour tout seuls."

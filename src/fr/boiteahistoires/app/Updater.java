@@ -21,7 +21,7 @@ import java.net.URL;
  * Comme l'appli est « propriétaire de l'appareil », l'installation se fait sans rien demander.
  */
 public final class Updater {
-    static final String DEFAULT_URL = "https://github.com/thibgrn37/boite-a-histoires/releases/latest/download/version.json";
+    static final String DEFAULT_URL = "https://raw.githubusercontent.com/thibgrn37/boite-a-histoires/main/release/version.json";
     static final long CHECK_EVERY = 12L * 3600 * 1000;
 
     private Updater() {}
