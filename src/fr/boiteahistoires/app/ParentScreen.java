@@ -22,7 +22,7 @@ import java.util.Locale;
 final class ParentScreen {
     private final MainActivity a;
     private final ScrollView scroll;
-    private TextView updTv, statusTv, lastTv, spaceTv, addResult, kioskInfo, batteryTv;
+    private TextView logTv, updTv, statusTv, lastTv, spaceTv, addResult, kioskInfo, batteryTv;
     private LinearLayout podcastsBox;
     private Button kioskBtn, settingsBtn, batteryBtn, releaseBtn, addBtn;
     private boolean adding = false;
@@ -196,6 +196,11 @@ final class ParentScreen {
         });
         up.addView(check, Ui.lpMargins(a, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 8, 0, 0));
 
+        LinearLayout lg = section(col, "Journal (pour comprendre un problème)");
+        logTv = small("");
+        logTv.setTextIsSelectable(true);
+        lg.addView(logTv);
+
         TextView ver = small("Boîte à histoires " + Updater.currentVersionName(a));
         ver.setGravity(Gravity.CENTER);
         col.addView(ver, Ui.lpMargins(a, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 16, 0, 0));
@@ -234,6 +239,8 @@ final class ParentScreen {
     }
 
     void refresh() {
+        String j = Store.journal();
+        logTv.setText(j.isEmpty() ? "Rien pour l'instant." : j);
         String us = Store.updateStatus();
         updTv.setText(us.isEmpty() ? "Pas encore vérifié." : us);
         String st = Store.status();

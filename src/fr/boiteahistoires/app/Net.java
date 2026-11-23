@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
 
 /** Réseau : HTTP avec redirections, téléchargements, conversion lien Apple → RSS. */
 public final class Net {
-    static final String UA = "Mozilla/5.0 (Linux; Android 14) BoiteAHistoires/1.0";
+    static final String UA = "Mozilla/5.0 (Linux; Android 14; 23124RA7EO) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36";
 
     private Net() {}
 
@@ -31,6 +31,7 @@ public final class Net {
             c.setReadTimeout(60000);
             c.setRequestProperty("User-Agent", UA);
             c.setRequestProperty("Accept", "*/*");
+            c.setRequestProperty("Accept-Language", "fr-FR,fr;q=0.9");
             int code = c.getResponseCode();
             if (code >= 300 && code < 400) {
                 String loc = c.getHeaderField("Location");
@@ -97,6 +98,22 @@ public final class Net {
 
     private static final Pattern APPLE_ID = Pattern.compile("id(\\d{5,})");
     private static final Pattern DIGITS = Pattern.compile("/(\\d{5,})(?:[/?#]|$)");
+
+    /** Cherche un podcast sur Apple Podcasts ; garde le résultat dont le nom contient {@code mustContain}. */
+    public static String searchFeed(String term, String mustContain) throws Exception {
+        String q = URLEncoder.encode(term, "UTF-8");
+        for (String country : new String[]{"FR", "BE", "CH", "CA"}) {
+            JSONObject o = new JSONObject(text("https://itunes.apple.com/search?media=podcast&entity=podcast&limit=25&country=" + country + "&term=" + q));
+            JSONArray r = o.optJSONArray("results");
+            for (int i = 0; r != null && i < r.length(); i++) {
+                JSONObject it = r.getJSONObject(i);
+                String name = it.optString("collectionName", "").toLowerCase();
+                String f = it.optString("feedUrl", "");
+                if (!f.isEmpty() && name.contains(mustContain.toLowerCase())) return f;
+            }
+        }
+        throw new IOException("introuvable sur Apple Podcasts");
+    }
 
     /**
      * Transforme ce que le parent a saisi en adresse de flux RSS :

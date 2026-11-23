@@ -349,7 +349,7 @@ public final class Store {
 
     /** Mémorise l'image trouvée sur la page web de l'épisode ("" = rien trouvé). */
     public static synchronized void setPageImage(String eid, String url) {
-        for (Episode e : episodes) if (e.id.equals(eid)) { e.pageImage = url == null ? "" : url; break; }
+        for (Episode e : episodes) if (e.id.equals(eid)) { e.pageImage = url; break; }
         save();
     }
 
@@ -390,6 +390,28 @@ public final class Store {
     public static void setLastUpdateCheck(long t) { prefs.edit().putLong("maj_verif", t).apply(); }
     public static String updateStatus() { return prefs.getString("maj_statut", ""); }
     public static void setUpdateStatus(String s) { prefs.edit().putString("maj_statut", s).apply(); changed(); }
+
+    private static final java.util.LinkedList<String> journal = new java.util.LinkedList<>();
+
+    /** Petit journal visible dans l'espace parents (40 dernières lignes). */
+    public static void log(String msg) {
+        Log.i(TAG, msg);
+        String line = new java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.FRANCE).format(new java.util.Date()) + "  " + msg;
+        synchronized (journal) {
+            if (journal.isEmpty()) {
+                String old = prefs.getString("journal", "");
+                if (!old.isEmpty()) for (String l : old.split("\n")) journal.add(l);
+            }
+            journal.addFirst(line);
+            while (journal.size() > 40) journal.removeLast();
+            StringBuilder sb = new StringBuilder();
+            for (String l : journal) { if (sb.length() > 0) sb.append('\n'); sb.append(l); }
+            prefs.edit().putString("journal", sb.toString()).apply();
+        }
+        changed();
+    }
+
+    public static String journal() { return prefs.getString("journal", ""); }
 
     public static boolean flag(String k) { return prefs.getBoolean(k, false); }
     public static void setFlag(String k) { prefs.edit().putBoolean(k, true).apply(); }

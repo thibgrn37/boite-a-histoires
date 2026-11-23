@@ -51,6 +51,8 @@ public final class Sync {
     /** @return true si tout a été traité. */
     static boolean runAll(AtomicBoolean stop) {
         boolean ok = true;
+        Store.log("Mise à jour lancée");
+        migrateImages();
         seedDefaults();
         do {
             again = false;
@@ -63,6 +65,7 @@ public final class Sync {
                     ok = false;
                     Log.e(Store.TAG, "sync " + p.name, e);
                     Store.setStatus("Problème avec « " + p.name + " » : " + e.getMessage());
+                    Store.log("Problème avec « " + p.name + " » : " + e);
                     sleep(2000);
                 }
             }
@@ -70,6 +73,7 @@ public final class Sync {
         if (stop.get()) return false;
         Store.setLastSync(System.currentTimeMillis());
         if (ok) Store.setStatus("Tout est à jour ✔");
+        Store.log("Mise à jour terminée" + (ok ? "" : " avec des erreurs"));
         return true;
     }
 
@@ -132,42 +136,79 @@ public final class Sync {
             + "|<meta[^>]+content=[\"']([^\"']+)[\"'][^>]*(?:property|name)=[\"'](?:og:image|twitter:image)[\"']",
             java.util.regex.Pattern.CASE_INSENSITIVE);
 
-    /** Image propre à l'épisode : celle du flux, sinon celle de sa page web (og:image). */
-    static String episodeImage(Store.Episode e, Store.Podcast p) {
-        if (e.imageUrl != null && !e.imageUrl.equals(p.imageUrl)) return e.imageUrl;
-        if (e.pageImage == null && e.pageUrl != null) {
-            String found = "";
-            try {
-                String html = Net.text(e.pageUrl);
-                java.util.regex.Matcher m = OG_IMAGE.matcher(html);
-                if (m.find()) found = (m.group(1) != null ? m.group(1) : m.group(2)).replace("&amp;", "&");
-            } catch (Exception ex) {
-                Log.w(Store.TAG, "page épisode", ex);
-                return null; // on réessaiera plus tard
-            }
-            Store.setPageImage(e.id, found);
-            e.pageImage = found;
+    /** Page web propre à l'épisode (pas juste l'accueil du site). */
+    static boolean isEpisodePage(String url) {
+        if (url == null) return false;
+        try {
+            String path = new java.net.URL(url).getPath();
+            return path != null && path.replaceAll("/+$", "").split("/").length > 2;
+        } catch (Exception ex) {
+            return false;
         }
-        if (e.pageImage != null && !e.pageImage.isEmpty() && !e.pageImage.equals(p.imageUrl)) return e.pageImage;
+    }
+
+    /**
+     * Image propre à l'épisode. Priorité à l'illustration de la page web de l'épisode (og:image),
+     * car beaucoup de flux (Radio France) reprennent l'image de l'émission pour chaque épisode.
+     */
+    static String episodeImage(Store.Episode e, Store.Podcast p) {
+        if (isEpisodePage(e.pageUrl)) {
+            if (e.pageImage == null) {
+                String found = "";
+                try {
+                    String html = Net.text(e.pageUrl);
+                    java.util.regex.Matcher m = OG_IMAGE.matcher(html);
+                    if (m.find()) found = (m.group(1) != null ? m.group(1) : m.group(2)).replace("&amp;", "&");
+                    Store.log(found.isEmpty() ? "Pas d'image trouvée sur la page de « " + e.title + " »"
+                            : "Image trouvée pour « " + e.title + " »");
+                } catch (Exception ex) {
+                    Store.log("Page de « " + e.title + " » illisible : " + ex.getMessage());
+                    return null; // on réessaiera plus tard
+                }
+                Store.setPageImage(e.id, found);
+                e.pageImage = found;
+            }
+            if (!e.pageImage.isEmpty() && !e.pageImage.equals(p.imageUrl)) return e.pageImage;
+        }
+        if (e.imageUrl != null && !e.imageUrl.equals(p.imageUrl)) return e.imageUrl;
         return null;
     }
 
     /** Ajoute une fois les podcasts proposés par défaut (cherchés par leur nom sur Apple Podcasts). */
     static void seedDefaults() {
-        String[] names = {"Les aventures du professeur Caillou"};
-        for (String n : names) {
-            String key = "seed_" + Store.hash(n);
+        String[][] wanted = {{"Les aventures du professeur Caillou", "caillou"}};
+        for (String[] w : wanted) {
+            String key = "seed2_" + Store.hash(w[0]);
             if (Store.flag(key)) continue;
+            boolean present = false;
+            for (Store.Podcast p : Store.podcasts()) if (p.name.toLowerCase().contains(w[1])) present = true;
+            if (present) { Store.setFlag(key); continue; }
             try {
-                String feed = Net.resolveFeed("", n);
+                String feed = Net.searchFeed(w[0], w[1]);
+                Store.log("« " + w[0] + " » : flux trouvé " + feed);
                 FeedParser.Feed f = FeedParser.parse(Net.bytes(feed));
-                Store.Podcast p = Store.addPodcast(f.title.isEmpty() ? n : f.title, feed, f.imageUrl, 0);
+                Store.Podcast p = Store.addPodcast(f.title.isEmpty() ? w[0] : f.title, feed, f.imageUrl, 0);
                 if (p != null) Store.mergeEpisodes(p.id, f.items);
+                Store.log("« " + w[0] + " » ajouté (" + f.items.size() + " épisodes)");
                 Store.setFlag(key);
             } catch (Exception ex) {
-                Log.w(Store.TAG, "ajout " + n, ex);
+                Store.log("Ajout de « " + w[0] + " » impossible : " + ex.getMessage());
             }
         }
+    }
+
+    /** Une seule fois en 1.6 : on reprend les images d'épisodes (les anciennes étaient celles de l'émission). */
+    static void migrateImages() {
+        if (Store.flag("images_v2")) return;
+        for (Store.Podcast p : Store.podcasts()) {
+            for (Store.Episode e : Store.episodes(p.id)) {
+                Store.image(e).delete();
+                if (e.pageImage != null) Store.setPageImage(e.id, null);
+                e.pageImage = null;
+            }
+        }
+        Store.setFlag("images_v2");
+        Store.log("Images d'épisodes remises à zéro, elles vont être retéléchargées.");
     }
 
     static String lastSyncText() {
