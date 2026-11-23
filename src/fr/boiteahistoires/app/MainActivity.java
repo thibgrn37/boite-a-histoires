@@ -75,6 +75,9 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
     protected void onCreate(Bundle b) {
         super.onCreate(b);
         Store.init(this);
+        // Afficher l'appli directement au réveil, par-dessus l'écran « glisser pour déverrouiller ».
+        setShowWhenLocked(true);
+        dismissKeyguard();
         player = Player.get(this);
         root = new FrameLayout(this);
         root.setBackgroundColor(Ui.CREAM);
@@ -92,6 +95,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         super.onResume();
         Store.addListener(this);
         player.addListener(this);
+        dismissKeyguard();
         if (screen != PARENT) Kiosk.sync(this);
         applyImmersive();
         VolumeCap.enforce(this);
@@ -148,6 +152,13 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
             }, 100);
         }
         return super.dispatchKeyEvent(event);
+    }
+
+    private void dismissKeyguard() {
+        try {
+            android.app.KeyguardManager km = getSystemService(android.app.KeyguardManager.class);
+            if (km != null && km.isKeyguardLocked() && !km.isKeyguardSecure()) km.requestDismissKeyguard(this, null);
+        } catch (Exception ignored) { }
     }
 
     void applyImmersive() {
