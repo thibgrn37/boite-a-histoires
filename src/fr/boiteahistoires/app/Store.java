@@ -464,8 +464,11 @@ public final class Store {
 
     private static void add(int episodes, long ms) {
         SharedPreferences.Editor ed = prefs.edit();
-        ed.putString("ecoutes_jour", today()).putInt("ecoutes", playedToday() + episodes).putLong("ecoute_ms", listenedTodayMs() + ms);
-        if (inEvening()) ed.putString("soir_cle", eveningKey()).putInt("soir_ep", playedEvening() + episodes).putLong("soir_ms", listenedEveningMs() + ms);
+        boolean ev = inEvening();
+        // Avec une limite du soir, le soir a son propre compteur : la limite de la journée ne compte que la journée.
+        if (!(ev && eveningLimit() > 0))
+            ed.putString("ecoutes_jour", today()).putInt("ecoutes", playedToday() + episodes).putLong("ecoute_ms", listenedTodayMs() + ms);
+        if (ev) ed.putString("soir_cle", eveningKey()).putInt("soir_ep", playedEvening() + episodes).putLong("soir_ms", listenedEveningMs() + ms);
         ed.apply();
     }
     public static void addPlayed() { add(1, 0); changed(); }
@@ -480,6 +483,7 @@ public final class Store {
     public static boolean dayLimitReached() {
         int l = episodeLimit();
         if (l <= 0) return false;
+        if (eveningLimit() > 0 && inEvening()) return false;
         return limitType() == 1 ? listenedTodayMs() >= l * 60000L : playedToday() >= l;
     }
     public static boolean eveningLimitReached() {

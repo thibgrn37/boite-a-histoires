@@ -85,7 +85,7 @@ final class ParentScreen {
 
         // Limite d'épisodes
         LinearLayout lim = section(col, "Limites d'écoute");
-        lim.addView(Ui.text(a, "Toute la journée", 16, Ui.DARK, true));
+        lim.addView(Ui.text(a, "La journée", 16, Ui.DARK, true));
         limitBlock(lim, false);
         View sep = new View(a);
         sep.setBackgroundColor(0x22000000);
@@ -94,7 +94,7 @@ final class ParentScreen {
         limitBlock(lim, true);
         playedTv = small("");
         lim.addView(playedTv);
-        lim.addView(small("Quand une limite est atteinte, la lecture s'arrête et une lune s'affiche ; impossible de relancer. La limite du jour repart à zéro à minuit, celle du soir à chaque début de soirée. Les heures du soir se règlent dans « Mode nuit »."));
+        lim.addView(small("Quand une limite est atteinte, la lecture s'arrête et une lune s'affiche ; impossible de relancer. On compte les épisodes écoutés jusqu'au bout et les minutes de vraie lecture (pas la pause). Si une limite du soir est réglée, le soir repart avec son propre compteur à zéro ; la limite de la journée ne compte alors que la journée. Les heures du soir se règlent dans « Mode nuit »."));
         Button resetBtn = Ui.button(a, "Remettre le compteur à zéro", Ui.BLUE);
         resetBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { Store.resetPlayed(); refresh(); }
