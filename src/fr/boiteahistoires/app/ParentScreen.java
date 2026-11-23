@@ -186,9 +186,11 @@ final class ParentScreen {
         check.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 Store.setUpdateUrl(urlEt.getText().toString());
+                // L'écran de confirmation d'Android ne peut pas s'ouvrir pendant l'épinglage.
+                if (!Kiosk.isOwner(a) && Kiosk.isLocked(a)) { try { a.stopLockTask(); } catch (Exception ignored) { } }
                 Store.setUpdateStatus("Recherche d'une nouvelle version…");
                 new Thread(new Runnable() {
-                    @Override public void run() { Updater.check(a.getApplicationContext()); }
+                    @Override public void run() { Updater.check(a.getApplicationContext(), true); }
                 }).start();
             }
         });
@@ -253,15 +255,16 @@ final class ParentScreen {
             kioskBtn.setAlpha(1f);
             releaseBtn.setVisibility(View.VISIBLE);
         } else {
-            kioskInfo.setText("Pas encore possible : l'appli doit d'abord être déclarée « propriétaire de l'appareil » depuis l'ordinateur (voir le guide, commande adb dpm set-device-owner).");
-            kioskBtn.setText("Mode kiosque indisponible");
-            kioskBtn.setEnabled(false);
-            kioskBtn.setAlpha(0.4f);
+            kioskInfo.setText(on ? "Activé (épinglage) : l'appli s'épingle à l'écran et cache les barres. Pour sortir sans code : appui long simultané sur Retour + Aperçu (ou glisser-maintenir selon les gestes)."
+                    : "Désactivé : le téléphone fonctionne normalement.");
+            kioskBtn.setText(on ? "Quitter le mode kiosque" : "Activer le mode kiosque (épinglage)");
+            kioskBtn.setEnabled(true);
+            kioskBtn.setAlpha(1f);
             releaseBtn.setVisibility(View.GONE);
         }
-        settingsBtn.setVisibility(owner && on ? View.GONE : View.VISIBLE);
+        settingsBtn.setVisibility(on ? View.GONE : View.VISIBLE);
         boolean bat = Kiosk.ignoresBattery(a);
-        boolean locked = owner && on;
+        boolean locked = on;
         batteryTv.setText(bat ? "Optimisation de batterie : désactivée pour l'appli ✔"
                 : (locked ? "Conseillé : désactiver l'optimisation de batterie (quitte d'abord le mode kiosque pour y accéder)."
                           : "Conseillé : désactiver l'optimisation de batterie pour que les téléchargements se fassent."));

@@ -70,7 +70,8 @@ public final class Kiosk {
         applyPolicies(act);
         boolean locked = isLocked(act);
         try {
-            if (Store.kiosk() && isOwner(act) && !locked) act.startLockTask();
+            // Sans droits administrateur, startLockTask() active l'« épinglage d'application ».
+            if (Store.kiosk() && !locked) act.startLockTask();
             else if (!Store.kiosk() && locked) act.stopLockTask();
         } catch (Exception e) {
             Log.e(Store.TAG, "lock task", e);

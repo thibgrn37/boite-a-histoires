@@ -92,7 +92,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         super.onResume();
         Store.addListener(this);
         player.addListener(this);
-        Kiosk.sync(this);
+        if (screen != PARENT) Kiosk.sync(this);
         applyImmersive();
         VolumeCap.enforce(this);
         onLibraryChanged();
@@ -135,7 +135,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
                 break;
             default:
                 // Écran d'accueil : on ne quitte pas.
-                if (!Kiosk.isOwner(this) || !Store.kiosk()) super.onBackPressed();
+                if (!Store.kiosk()) super.onBackPressed();
         }
     }
 
@@ -151,7 +151,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
     }
 
     void applyImmersive() {
-        boolean hide = Store.kiosk() && Kiosk.isOwner(this);
+        boolean hide = Store.kiosk();
         if (Build.VERSION.SDK_INT >= 30) {
             WindowInsetsController c = getWindow().getInsetsController();
             if (c == null) return;

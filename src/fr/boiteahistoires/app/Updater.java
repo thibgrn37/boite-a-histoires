@@ -46,11 +46,11 @@ public final class Updater {
     /** Appelé après chaque mise à jour des podcasts : vérifie au plus toutes les 12 h. */
     static void maybeCheck(Context c) {
         if (System.currentTimeMillis() - Store.lastUpdateCheck() < CHECK_EVERY) return;
-        check(c);
+        check(c, false);
     }
 
     /** Vérifie et installe si besoin. À appeler hors du fil principal. */
-    public static void check(Context c) {
+    public static void check(Context c, boolean interactive) {
         Store.setLastUpdateCheck(System.currentTimeMillis());
         String url = Store.updateUrl();
         if (url.isEmpty()) return;
@@ -72,6 +72,11 @@ public final class Updater {
             if (pi == null || !c.getPackageName().equals(pi.packageName) || pi.getLongVersionCode() <= local) {
                 apk.delete();
                 Store.setUpdateStatus("Le fichier téléchargé n'est pas une mise à jour valide.");
+                return;
+            }
+            if (!interactive && !Kiosk.isOwner(c)) {
+                // Sans droits administrateur, Android demande une confirmation : on attend le parent.
+                Store.setUpdateStatus("Nouvelle version " + name + " disponible : touche « Vérifier les mises à jour » pour l'installer.");
                 return;
             }
             Store.setUpdateStatus("Installation de la version " + name + "…");
