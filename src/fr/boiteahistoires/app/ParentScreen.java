@@ -94,7 +94,7 @@ final class ParentScreen {
         limitBlock(lim, true);
         playedTv = small("");
         lim.addView(playedTv);
-        lim.addView(small("Quand une limite est atteinte, l'histoire en cours va jusqu'au bout, puis la lecture s'arrête et une lune s'affiche ; impossible d'en relancer une. On compte les épisodes écoutés jusqu'au bout et les minutes de vraie lecture (pas la pause). Si une limite du soir est réglée, le soir repart avec son propre compteur à zéro ; la limite de la journée ne compte alors que la journée. Les heures du soir se règlent dans « Mode nuit »."));
+        lim.addView(small("Quand une limite est atteinte, l'histoire en cours va jusqu'au bout, sans pouvoir changer d'histoire (précédent, suivant et autres épisodes bloqués), puis la lecture s'arrête et une lune s'affiche. On compte les épisodes écoutés jusqu'au bout et les minutes de vraie lecture (pas la pause). Si une limite du soir est réglée, le soir repart avec son propre compteur à zéro ; la limite de la journée ne compte alors que la journée. Les heures du soir se règlent dans « Mode nuit »."));
         Button resetBtn = Ui.button(a, "Remettre le compteur à zéro", Ui.BLUE);
         resetBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { Store.resetPlayed(); refresh(); }

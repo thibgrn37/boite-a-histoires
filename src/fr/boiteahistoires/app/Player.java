@@ -143,8 +143,12 @@ public final class Player implements MediaPlayer.OnPreparedListener, MediaPlayer
         try { return mp != null && prepared ? mp.getDuration() : 0; } catch (Exception e) { return 0; }
     }
 
-    public boolean hasNext() { return index >= 0 && index + 1 < queue.size(); }
-    public boolean hasPrevious() { return index > 0; }
+    public boolean hasNext() { return index >= 0 && index + 1 < queue.size() && !Store.limitReached(); }
+    public boolean hasPrevious() { return index > 0 && !Store.limitReached(); }
+
+    private void seekToStart() {
+        try { if (mp != null && prepared) mp.seekTo(0); } catch (Exception ignored) { }
+    }
 
     // ------------------------------------------------------------------ commandes
 
@@ -187,13 +191,14 @@ public final class Player implements MediaPlayer.OnPreparedListener, MediaPlayer
     }
 
     public void next() {
-        if (!hasNext()) return;
+        if (!hasNext() || Store.limitReached()) return;
         savePosition();
         index++;
         load(true);
     }
 
     public void previous() {
+        if (Store.limitReached()) return;
         if (hasPrevious()) {
             savePosition();
             index--;
