@@ -81,7 +81,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
 
     private final Runnable tick = new Runnable() {
         @Override public void run() {
-            if (screen == PLAYER) updateProgress();
+            if (screen == PLAYER) { updateProgress(); if (plPrev != null) plPrev.setAlpha(player.canGoBack() ? 1f : 0.35f); }
             if (++ticks % 60 == 0) {
                 applyTheme();
                 if (!dimmed) applyBrightness();
@@ -768,7 +768,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         plPlay.setImageResource(!player.canPlayCurrent() && !player.isActive() ? R.drawable.ic_moon
                 : (player.isActive() ? R.drawable.ic_pause : R.drawable.ic_play));
         if (plFav != null) plFav.setImageResource(Store.isFav(e.id) ? R.drawable.ic_heart : R.drawable.ic_heart_outline);
-        plPrev.setAlpha(player.hasPrevious() ? 1f : 0.35f);
+        plPrev.setAlpha(player.canGoBack() ? 1f : 0.35f);
         plNext.setAlpha(player.hasNext() ? 1f : 0.35f);
         updateProgress();
     }

@@ -145,6 +145,8 @@ public final class Player implements MediaPlayer.OnPreparedListener, MediaPlayer
 
     public boolean hasNext() { return index >= 0 && index + 1 < queue.size() && !Store.limitReached(); }
     public boolean hasPrevious() { return index > 0 && !Store.limitReached(); }
+    /** Vrai si le bouton précédent fait quelque chose (début de l'épisode ou épisode précédent). */
+    public boolean canGoBack() { return !Store.limitReached() && (index > 0 || position() > 5000); }
 
     private void seekToStart() {
         try { if (mp != null && prepared) mp.seekTo(0); } catch (Exception ignored) { }
@@ -215,8 +217,16 @@ public final class Player implements MediaPlayer.OnPreparedListener, MediaPlayer
         load(true);
     }
 
+    /** Précédent : après 5 s d'écoute, revient au début de l'épisode ; sinon, épisode précédent. */
     public void previous() {
         if (Store.limitReached()) return;
+        if (mp != null && prepared && position() > 5000) {
+            Store.Podcast p = Store.podcast(current().podcastId);
+            mp.seekTo(p == null ? 0 : p.skipSeconds * 1000);
+            savePosition();
+            fire();
+            return;
+        }
         if (hasPrevious()) {
             savePosition();
             index--;
