@@ -55,7 +55,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
     private TextView miniTitle;
 
     // lecteur
-    private ImageView plImg, plPlay, plPrev, plNext;
+    private ImageView plImg, plPlay, plPrev, plNext, plFav;
     private TextView plTitle;
     private ProgressBar plProgress;
     private String shownEpisodeId;
@@ -82,7 +82,11 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
     private final Runnable tick = new Runnable() {
         @Override public void run() {
             if (screen == PLAYER) updateProgress();
-            if (++ticks % 60 == 0) applyTheme();
+            if (++ticks % 60 == 0) {
+                applyTheme();
+                if (!dimmed) applyBrightness();
+                VolumeCap.enforce(MainActivity.this);
+            }
             handler.postDelayed(this, 500);
         }
     };
@@ -134,6 +138,12 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         handler.removeCallbacks(tick);
         handler.removeCallbacks(dimTask);
         try { unregisterReceiver(batteryReceiver); } catch (Exception ignored) { }
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (parent != null) parent.onResult(req, res, data);
     }
 
     @Override
@@ -189,7 +199,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
     /** Luminosité imposée par le parent (0 = réglage normal du téléphone), ou très basse si l'écran est assombri. */
     void applyBrightness() {
         android.view.WindowManager.LayoutParams lp = getWindow().getAttributes();
-        int b = Store.brightness();
+        int b = Store.effectiveBrightness();
         if (dimmed) lp.screenBrightness = 0.01f;
         else lp.screenBrightness = b <= 0 ? android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE : b / 100f;
         getWindow().setAttributes(lp);
@@ -328,19 +338,53 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         }
     }
 
+    // ------------------------------------------------------------------ favoris / listes
+
+    /** Faux podcast « Mes favoris », affiché en premier sur l'accueil. */
+    private static Store.Podcast favPodcast() {
+        Store.Podcast f = new Store.Podcast();
+        f.id = Store.FAVORIS;
+        f.name = "Mes favoris";
+        return f;
+    }
+
+    private void fillHomeList() {
+        podList.clear();
+        if (!Store.favorites().isEmpty()) podList.add(favPodcast());
+        podList.addAll(Store.visiblePodcasts());
+    }
+
+    private static List<Store.Episode> listFor(String pid) {
+        return Store.FAVORIS.equals(pid) ? Store.favorites() : Store.visibleEpisodes(pid);
+    }
+
+    /** Au démarrage : le dernier épisode écouté apparaît dans la barre du bas, prêt à reprendre. */
+    private void restoreLast() {
+        if (player.current() != null) return;
+        String eid = Store.lastEpisodeId(), lid = Store.lastListId();
+        if (eid == null) return;
+        Store.Episode e = Store.episode(eid);
+        if (e == null || !Store.audio(e).exists() || Store.isDone(eid)) return;
+        if (lid == null) lid = e.podcastId;
+        List<Store.Episode> l = listFor(lid);
+        int idx = -1;
+        for (int i = 0; i < l.size(); i++) if (l.get(i).id.equals(eid)) idx = i;
+        if (idx < 0) return;
+        player.restore(l, idx, lid);
+    }
+
     // ------------------------------------------------------------------ écouteurs
 
     @Override
     public void onLibraryChanged() {
         if (screen == HOME) {
-            podList.clear();
-            podList.addAll(Store.podcasts());
+            fillHomeList();
             if (gridAdapter != null) gridAdapter.notifyDataSetChanged();
             if (emptyText != null) emptyText.setVisibility(podList.isEmpty() ? View.VISIBLE : View.GONE);
         } else if (screen == EPISODES) {
-            if (Store.podcast(podcastId) == null) { showHome(); return; }
+            if (!Store.FAVORIS.equals(podcastId) && Store.podcast(podcastId) == null) { showHome(); return; }
             epList.clear();
-            epList.addAll(Store.downloaded(podcastId));
+            epList.addAll(listFor(podcastId));
             if (gridAdapter != null) gridAdapter.notifyDataSetChanged();
             if (emptyText != null) emptyText.setVisibility(epList.isEmpty() ? View.VISIBLE : View.GONE);
         } else if (screen == PARENT && parent != null) {
@@ -414,8 +458,8 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
 
         FrameLayout body = new FrameLayout(this);
         grid = makeGrid(170);
-        podList.clear();
-        podList.addAll(Store.podcasts());
+        restoreLast();
+        fillHomeList();
         gridAdapter = new BaseAdapter() {
             @Override public int getCount() { return podList.size(); }
             @Override public Object getItem(int i) { return podList.get(i); }
@@ -424,8 +468,18 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
                 Ui.Card card = convert instanceof Ui.Card ? (Ui.Card) convert : new Ui.Card(MainActivity.this);
                 Store.Podcast p = podList.get(i);
                 card.setPlaceholder(p.name);
+                card.letter.setTextSize(TypedValue.COMPLEX_UNIT_SP, 56);
+                if (Store.FAVORIS.equals(p.id)) {
+                    Images.load(card.image, null, 0);
+                    ((android.graphics.drawable.GradientDrawable) card.getBackground().mutate()).setColor(0xFFF06292);
+                    card.letter.setText("♥");
+                    card.letter.setTextSize(TypedValue.COMPLEX_UNIT_SP, 110);
+                    card.setBadge(0, 0);
+                    card.setHighlighted(false);
+                    return card;
+                }
                 Images.load(card.image, Store.cover(p.id), Ui.dp(MainActivity.this, 200));
-                boolean none = Store.downloaded(p.id).isEmpty();
+                boolean none = Store.visibleEpisodes(p.id).isEmpty();
                 card.setBadge(none ? R.drawable.ic_hourglass : 0, Ui.GREY);
                 Store.Episode cur = player.current();
                 card.setHighlighted(cur != null && cur.podcastId.equals(p.id));
@@ -468,7 +522,8 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
     // ------------------------------------------------------------------ épisodes
 
     private void showEpisodes(String pid) {
-        final Store.Podcast p = Store.podcast(pid);
+        final boolean favs = Store.FAVORIS.equals(pid);
+        final Store.Podcast p = favs ? favPodcast() : Store.podcast(pid);
         if (p == null) { showHome(); return; }
         screen = EPISODES;
         podcastId = pid;
@@ -487,7 +542,11 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         Ui.Card mini = new Ui.Card(this);
         mini.setPlaceholder(p.name);
         mini.letter.setTextSize(TypedValue.COMPLEX_UNIT_SP, 24);
-        Images.load(mini.image, Store.cover(p.id), Ui.dp(this, 64));
+        if (favs) {
+            ((android.graphics.drawable.GradientDrawable) mini.getBackground().mutate()).setColor(0xFFF06292);
+            mini.letter.setText("♥");
+            mini.letter.setTextSize(TypedValue.COMPLEX_UNIT_SP, 36);
+        } else Images.load(mini.image, Store.cover(p.id), Ui.dp(this, 64));
         header.addView(mini, Ui.lpMargins(this, Ui.dp(this, 64), Ui.dp(this, 64), 16, 0, 12, 0));
         TextView name = Ui.text(this, p.name, 20, Ui.INK, true);
         name.setMaxLines(2);
@@ -497,7 +556,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         FrameLayout body = new FrameLayout(this);
         grid = makeGrid(150);
         epList.clear();
-        epList.addAll(Store.downloaded(pid));
+        epList.addAll(listFor(pid));
         gridAdapter = new BaseAdapter() {
             @Override public int getCount() { return epList.size(); }
             @Override public Object getItem(int i) { return epList.get(i); }
@@ -521,13 +580,17 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
                     cell.addView(title);
                 }
                 Store.Episode e = epList.get(i);
-                card.setPlaceholder(p.name);
+                Store.Podcast ep = favs ? Store.podcast(e.podcastId) : p;
+                card.setPlaceholder(ep == null ? p.name : ep.name);
                 Images.load(card.image, Store.displayImage(e), Ui.dp(MainActivity.this, 180));
                 Store.Episode cur = player.current();
                 boolean playing = cur != null && cur.id.equals(e.id);
                 card.setHighlighted(playing);
                 if (playing) card.setBadge(player.isActive() ? R.drawable.ic_play : R.drawable.ic_pause, Ui.ORANGE);
-                else card.setBadge(Store.isDone(e.id) ? R.drawable.ic_check : 0, Ui.GREEN);
+                else if (Store.isDone(e.id)) card.setBadge(R.drawable.ic_check, Ui.GREEN);
+                else if (Store.position(e.id) > 5000) card.setBadge(R.drawable.ic_play, Ui.BLUE); // commencé : on reprendra là
+                else if (Store.isFav(e.id)) card.setBadge(R.drawable.ic_heart, 0xFFF06292);
+                else card.setBadge(0, 0);
                 title.setText(e.title);
                 return cell;
             }
@@ -536,7 +599,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         grid.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override public void onItemClick(AdapterView<?> a, View v, int pos, long id) {
                 if (!player.canPlay(epList.get(pos))) { showSleep(); return; }
-                player.play(new ArrayList<>(epList), pos);
+                player.play(new ArrayList<>(epList), pos, podcastId);
                 showPlayer();
             }
         });
@@ -609,7 +672,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         Store.Episode e = player.current();
         if (e == null) return;
         screen = PLAYER;
-        podcastId = e.podcastId;
+        podcastId = player.listId() != null ? player.listId() : e.podcastId;
         miniBar = null;
         root.removeAllViews();
         DisplayMetrics dm = getResources().getDisplayMetrics();
@@ -625,6 +688,18 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
             @Override public void onClick(View v) { onBackPressed(); }
         });
         header.addView(back);
+        header.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
+        // Cœur : l'enfant ajoute / retire l'histoire de ses favoris.
+        plFav = Ui.roundButton(this, R.drawable.ic_heart_outline, 0xFFF06292, 72);
+        plFav.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                Store.Episode c = player.current();
+                if (c == null) return;
+                Store.setFav(c.id, !Store.isFav(c.id));
+                updatePlayer();
+            }
+        });
+        header.addView(plFav);
         col.addView(header, Ui.lp(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         col.addView(new View(this), new LinearLayout.LayoutParams(1, 0, 1));
@@ -692,6 +767,7 @@ public class MainActivity extends Activity implements Store.Listener, Player.Lis
         }
         plPlay.setImageResource(!player.canPlayCurrent() && !player.isActive() ? R.drawable.ic_moon
                 : (player.isActive() ? R.drawable.ic_pause : R.drawable.ic_play));
+        if (plFav != null) plFav.setImageResource(Store.isFav(e.id) ? R.drawable.ic_heart : R.drawable.ic_heart_outline);
         plPrev.setAlpha(player.hasPrevious() ? 1f : 0.35f);
         plNext.setAlpha(player.hasNext() ? 1f : 0.35f);
         updateProgress();

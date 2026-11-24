@@ -48,6 +48,24 @@ public final class Sync {
         Store.setStatus("Mise à jour prévue (attente du réseau)…");
     }
 
+    static final int JOB_RETRY = 3;
+
+    /** Après une erreur : on réessaie tout seul dans 15 min, puis 30, 60… (5 fois au plus avant la mise à jour normale). */
+    static void scheduleRetry(Context c) {
+        int n = Store.retries();
+        if (c == null || n >= 5) return;
+        Store.setRetries(n + 1);
+        long delay = 15L * 60000 << n;
+        JobScheduler js = c.getSystemService(JobScheduler.class);
+        JobInfo ji = new JobInfo.Builder(JOB_RETRY, new ComponentName(c, SyncJob.class))
+                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED)
+                .setMinimumLatency(delay)
+                .setPersisted(true)
+                .build();
+        js.schedule(ji);
+        Store.log("Nouvel essai automatique dans " + (delay / 60000) + " min");
+    }
+
     /** @return true si tout a été traité. */
     static boolean runAll(AtomicBoolean stop) {
         boolean ok = true;
@@ -72,7 +90,10 @@ public final class Sync {
         } while (again && !stop.get());
         if (stop.get()) return false;
         Store.setLastSync(System.currentTimeMillis());
-        if (ok) Store.setStatus("Tout est à jour ✔");
+        if (ok) {
+            Store.setStatus("Tout est à jour ✔");
+            Store.setRetries(0);
+        } else scheduleRetry(Store.context());
         Store.log("Mise à jour terminée" + (ok ? "" : " avec des erreurs"));
         return true;
     }
@@ -92,6 +113,7 @@ public final class Sync {
             try { Net.download(p.imageUrl, cover, stop); Store.changed(); } catch (Exception e) { Log.w(Store.TAG, "couverture", e); }
         }
 
+        boolean failed = false;
         List<Store.Episode> eps = Store.episodes(p.id);
         int keep = Math.min(p.keep, eps.size());
         int todo = 0;
@@ -115,14 +137,30 @@ public final class Sync {
             }
             done++;
             Store.setStatus("Téléchargement « " + p.name + " » " + done + "/" + todo + " : " + e.title);
-            Net.download(e.audioUrl, a, stop);
+            // Jusqu'à 3 essais par épisode ; en cas d'échec on passe au suivant et on réessaiera plus tard.
+            Exception last = null;
+            for (int attempt = 1; attempt <= 3 && !stop.get(); attempt++) {
+                try {
+                    Net.download(e.audioUrl, a, stop);
+                    last = null;
+                    break;
+                } catch (Exception ex) {
+                    last = ex;
+                    if (attempt < 3) sleep(attempt * 10000L);
+                }
+            }
+            if (last != null && !stop.get()) {
+                failed = true;
+                Store.log("Téléchargement raté « " + e.title + " » (" + p.name + ") : " + last);
+            }
             Store.changed();
         }
+        if (failed) return false;
         // On ne garde que les N plus récents (réglable par podcast).
         for (int i = keep; i < eps.size(); i++) {
             Store.Episode e = eps.get(i);
             File a = Store.audio(e);
-            if (a.exists() && !e.id.equals(Player.currentId())) {
+            if (a.exists() && !e.id.equals(Player.currentId()) && !Store.isFav(e.id)) {
                 a.delete();
                 Store.image(e).delete();
             }

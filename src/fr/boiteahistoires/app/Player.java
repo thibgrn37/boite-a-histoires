@@ -153,6 +153,24 @@ public final class Player implements MediaPlayer.OnPreparedListener, MediaPlayer
     // ------------------------------------------------------------------ commandes
 
     /** Lance un épisode d'une liste (les suivants s'enchaînent). */
+    /** Liste d'où vient la lecture (id de podcast ou Store.FAVORIS), pour la reprise. */
+    private String listId;
+    public String listId() { return listId; }
+
+    public void play(List<Store.Episode> list, int idx, String fromList) {
+        listId = fromList;
+        play(list, idx);
+    }
+
+    /** Prépare (sans lancer) le dernier épisode écouté, pour pouvoir le reprendre. */
+    public void restore(List<Store.Episode> list, int idx, String fromList) {
+        if (current() != null || list.isEmpty()) return;
+        listId = fromList;
+        queue = new ArrayList<>(list);
+        index = Math.max(0, Math.min(idx, list.size() - 1));
+        fire();
+    }
+
     public void play(List<Store.Episode> list, int idx) {
         Store.Episode target = list.get(idx);
         Store.Episode cur = current();
@@ -217,6 +235,7 @@ public final class Player implements MediaPlayer.OnPreparedListener, MediaPlayer
         Store.Episode e = current();
         if (e == null) { fire(); return; }
         File f = Store.audio(e);
+        Store.setLast(e.id, listId);
         if (!f.exists()) {
             Log.w(Store.TAG, "fichier absent " + f);
             if (hasNext()) { index++; load(autoplay); } else { stopForeground(); fire(); }

@@ -187,6 +187,46 @@ final class ParentScreen {
         vol.addView(sb, Ui.lpMargins(a, ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(a, 48), 0, 4, 0, 0));
         vol.addView(small("Les boutons de volume du téléphone ne pourront pas aller au-delà."));
 
+        // Le soir
+        LinearLayout soir = section(col, "Le soir (heures du mode nuit)");
+        soir.addView(percentSlider("Luminosité le soir", Store.eveningBrightness(), 3, new IntSetter() {
+            @Override public void set(int v) { Store.setEveningBrightness(v); a.applyBrightness(); }
+        }));
+        soir.addView(percentSlider("Volume maximum le soir", Store.eveningMaxVolume(), 5, new IntSetter() {
+            @Override public void set(int v) { Store.setEveningMaxVolume(v); VolumeCap.enforce(a); }
+        }));
+        soir.addView(small("Tout à gauche = comme la journée. Sinon, le soir l'écran et le son ne dépassent pas ces réglages (le volume ne dépasse jamais le maximum de la journée)."));
+
+        // Sauvegarde
+        LinearLayout sav = section(col, "Sauvegarde et restauration");
+        sav.addView(small("Enregistre dans un fichier la liste des podcasts, tous les réglages, les favoris, les épisodes masqués et où il en est dans chaque histoire. Garde-le par exemple dans Téléchargements ou envoie-le-toi."));
+        Button saveBtn = Ui.button(a, "Sauvegarder dans un fichier…", Ui.BLUE);
+        saveBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                unpin();
+                Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                i.setType("application/json");
+                i.putExtra(Intent.EXTRA_TITLE, "boite-a-histoires-sauvegarde-"
+                        + new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.FRANCE).format(new java.util.Date()) + ".json");
+                try { a.startActivityForResult(i, REQ_SAVE); } catch (Exception e) { savTv.setText("Impossible d'ouvrir le choix du fichier : " + e.getMessage()); }
+            }
+        });
+        sav.addView(saveBtn, Ui.lpMargins(a, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 8, 0, 0));
+        Button restBtn = Ui.button(a, "Restaurer depuis un fichier…", Ui.GREY);
+        restBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                unpin();
+                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                i.setType("*/*");
+                try { a.startActivityForResult(i, REQ_RESTORE); } catch (Exception e) { savTv.setText("Impossible d'ouvrir le choix du fichier : " + e.getMessage()); }
+            }
+        });
+        sav.addView(restBtn, Ui.lpMargins(a, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 8, 0, 0));
+        savTv = small("");
+        sav.addView(savTv);
+
         // Code
         LinearLayout code = section(col, "Code parent");
         final EditText codeEt = edit("Nouveau code (4 à 8 chiffres)", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
@@ -385,10 +425,11 @@ final class ParentScreen {
             LinearLayout info = new LinearLayout(a);
             info.setOrientation(LinearLayout.VERTICAL);
             info.setPadding(Ui.dp(a, 12), 0, 0, 0);
-            info.addView(Ui.text(a, p.name, 16, Ui.DARK, true));
+            info.addView(Ui.text(a, p.name + (Store.isHidden(p.id) ? " (masqué)" : ""), 16, Store.isHidden(p.id) ? Ui.GREY : Ui.DARK, true));
             int dl = Store.downloaded(p.id).size();
+            int hid = dl - Store.visibleEpisodes(p.id).size();
             int known = Store.episodes(p.id).size();
-            info.addView(small(dl + " épisode(s) sur le téléphone, " + known + " connu(s)"));
+            info.addView(small(dl + " épisode(s) sur le téléphone, " + known + " connu(s)" + (hid > 0 ? ", " + hid + " masqué(s)" : "")));
             top.addView(info, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
             row.addView(top);
 
@@ -402,6 +443,24 @@ final class ParentScreen {
             }, new Runnable() {
                 @Override public void run() { Store.setKeep(p.id, p.keep < 5 ? p.keep + 1 : p.keep + 5); }
             }));
+
+            LinearLayout btns = new LinearLayout(a);
+            final boolean hidden = Store.isHidden(p.id);
+            Button hide = Ui.button(a, hidden ? "Afficher" : "Masquer", hidden ? Ui.GREEN : Ui.GREY);
+            hide.setTextSize(14);
+            hide.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { Store.setHidden(p.id, !hidden); }
+            });
+            btns.addView(hide, Ui.lpMargins(a, 0, ViewGroup.LayoutParams.WRAP_CONTENT, 0, 6, 4, 0));
+            ((LinearLayout.LayoutParams) hide.getLayoutParams()).weight = 1;
+            Button epBtn = Ui.button(a, "Épisodes visibles…", Ui.BLUE);
+            epBtn.setTextSize(14);
+            epBtn.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { chooseEpisodes(p); }
+            });
+            btns.addView(epBtn, Ui.lpMargins(a, 0, ViewGroup.LayoutParams.WRAP_CONTENT, 4, 6, 0, 0));
+            ((LinearLayout.LayoutParams) epBtn.getLayoutParams()).weight = 1;
+            row.addView(btns);
 
             Button del = Ui.button(a, "Supprimer ce podcast", 0xFFE57373);
             del.setOnClickListener(new View.OnClickListener() {
@@ -519,6 +578,110 @@ final class ParentScreen {
         else if (type == 1) val.setText(v >= 60 ? (v / 60) + " h " + (v % 60 == 0 ? "" : (v % 60) + " min") : v + " minutes");
         else val.setText(v + " épisode" + (v > 1 ? "s" : ""));
         if (playedTv != null) refresh();
+    }
+
+    // ------------------------------------------------------------------ masquer des épisodes
+
+    private void chooseEpisodes(final Store.Podcast p) {
+        final List<Store.Episode> eps = Store.downloaded(p.id);
+        if (eps.isEmpty()) {
+            new AlertDialog.Builder(a).setMessage("Aucun épisode téléchargé pour l'instant.").setPositiveButton("OK", null).show();
+            return;
+        }
+        String[] titles = new String[eps.size()];
+        boolean[] checked = new boolean[eps.size()];
+        for (int i = 0; i < eps.size(); i++) {
+            titles[i] = eps.get(i).title;
+            checked[i] = !Store.isHidden(eps.get(i).id);
+        }
+        new AlertDialog.Builder(a)
+                .setTitle("Épisodes visibles : « " + p.name + " »")
+                .setMultiChoiceItems(titles, checked, new DialogInterface.OnMultiChoiceClickListener() {
+                    @Override public void onClick(DialogInterface d, int which, boolean isChecked) {
+                        Store.setHidden(eps.get(which).id, !isChecked);
+                    }
+                })
+                .setPositiveButton("OK", null)
+                .show();
+    }
+
+    // ------------------------------------------------------------------ réglages en % (0 = comme la journée)
+
+    interface IntSetter { void set(int v); }
+
+    private View percentSlider(final String label, int value, final int min, final IntSetter setter) {
+        LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(0, Ui.dp(a, 6), 0, 0);
+        final TextView tv = Ui.text(a, "", 15, Ui.DARK, false);
+        box.addView(tv);
+        SeekBar sb = new SeekBar(a);
+        sb.setMax(100);
+        sb.setProgress(value);
+        tv.setText(label + " : " + (value == 0 ? "comme la journée" : value + " %"));
+        sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override public void onProgressChanged(SeekBar s, int v, boolean user) {
+                int val = v == 0 ? 0 : Math.max(min, v);
+                tv.setText(label + " : " + (val == 0 ? "comme la journée" : val + " %"));
+                setter.set(val);
+            }
+            @Override public void onStartTrackingTouch(SeekBar s) { }
+            @Override public void onStopTrackingTouch(SeekBar s) { }
+        });
+        box.addView(sb, Ui.lpMargins(a, ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(a, 44), 0, 0, 0, 0));
+        return box;
+    }
+
+    // ------------------------------------------------------------------ sauvegarde / restauration
+
+    static final int REQ_SAVE = 71, REQ_RESTORE = 72;
+    private TextView savTv;
+
+    /** Le choix du fichier est une autre appli : on désépingle le temps du choix (on reste dans l'espace parents). */
+    private void unpin() {
+        if (!Kiosk.isOwner(a) && Kiosk.isLocked(a)) { try { a.stopLockTask(); } catch (Exception ignored) { } }
+    }
+
+    void onResult(int req, int res, Intent data) {
+        if (res != android.app.Activity.RESULT_OK || data == null || data.getData() == null) return;
+        final android.net.Uri uri = data.getData();
+        if (req == REQ_SAVE) {
+            try {
+                java.io.OutputStream out = a.getContentResolver().openOutputStream(uri, "wt");
+                out.write(Store.exportBackup().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                out.close();
+                savTv.setText("Sauvegarde enregistrée ✔");
+                Store.log("Sauvegarde enregistrée");
+            } catch (Exception e) {
+                savTv.setText("Sauvegarde impossible : " + e.getMessage());
+            }
+        } else if (req == REQ_RESTORE) {
+            new AlertDialog.Builder(a)
+                    .setTitle("Restaurer cette sauvegarde ?")
+                    .setMessage("Les podcasts du fichier sont ajoutés (ceux déjà là sont gardés) et les réglages sont remplacés, code parent compris.")
+                    .setPositiveButton("Restaurer", new DialogInterface.OnClickListener() {
+                        @Override public void onClick(DialogInterface d, int w) {
+                            try {
+                                java.io.InputStream in = a.getContentResolver().openInputStream(uri);
+                                java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                                byte[] buf = new byte[16384];
+                                int n;
+                                while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+                                in.close();
+                                int added = Store.importBackup(new String(bo.toByteArray(), java.nio.charset.StandardCharsets.UTF_8));
+                                Store.log("Sauvegarde restaurée (" + added + " podcast(s) ajouté(s))");
+                                Sync.runNow(a);
+                                a.showParent();
+                                a.applyBrightness();
+                                VolumeCap.enforce(a);
+                            } catch (Exception e) {
+                                savTv.setText("Restauration impossible : " + e.getMessage());
+                            }
+                        }
+                    })
+                    .setNegativeButton("Annuler", null)
+                    .show();
+        }
     }
 
     private View stepperTv(TextView label, final Runnable minus, final Runnable plus) {

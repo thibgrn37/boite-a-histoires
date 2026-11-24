@@ -26,7 +26,7 @@ public final class VolumeCap {
     public static int cap(Context c) {
         AudioManager am = c.getSystemService(AudioManager.class);
         int max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
-        return Math.max(1, Math.round(max * Store.maxVolume() / 100f));
+        return Math.max(1, Math.round(max * Store.effectiveMaxVolume() / 100f));
     }
 
     public static boolean atCap(Context c) {

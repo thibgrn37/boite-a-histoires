@@ -517,6 +517,175 @@ public final class Store {
     public static int dimDelay() { return prefs.getInt("veille_s", 30); }
     public static void setDimDelay(int s) { prefs.edit().putInt("veille_s", Math.max(0, Math.min(600, s))).apply(); }
 
+    // ---------------------------------------------------------------- masqués, favoris, reprise
+
+    private static java.util.Set<String> set(String key) {
+        return new java.util.HashSet<>(prefs.getStringSet(key, new java.util.HashSet<String>()));
+    }
+    private static void putSet(String key, java.util.Set<String> v) { prefs.edit().putStringSet(key, v).apply(); }
+
+    public static boolean isHidden(String id) { return prefs.getStringSet("caches", java.util.Collections.<String>emptySet()).contains(id); }
+    public static void setHidden(String id, boolean h) {
+        java.util.Set<String> s = set("caches");
+        if (h) s.add(id); else s.remove(id);
+        putSet("caches", s);
+        changed();
+    }
+
+    public static boolean isFav(String eid) { return prefs.getStringSet("favoris", java.util.Collections.<String>emptySet()).contains(eid); }
+    public static void setFav(String eid, boolean f) {
+        java.util.Set<String> s = set("favoris");
+        if (f) s.add(eid); else s.remove(eid);
+        putSet("favoris", s);
+        changed();
+    }
+
+    public static synchronized Episode episode(String id) {
+        if (id == null) return null;
+        for (Episode e : episodes) if (e.id.equals(id)) return e;
+        return null;
+    }
+
+    /** Podcasts visibles par l'enfant. */
+    public static List<Podcast> visiblePodcasts() {
+        ArrayList<Podcast> l = new ArrayList<>();
+        for (Podcast p : podcasts()) if (!isHidden(p.id)) l.add(p);
+        return l;
+    }
+
+    /** Épisodes téléchargés et visibles par l'enfant. */
+    public static List<Episode> visibleEpisodes(String pid) {
+        ArrayList<Episode> l = new ArrayList<>();
+        for (Episode e : downloaded(pid)) if (!isHidden(e.id)) l.add(e);
+        return l;
+    }
+
+    /** Favoris disponibles hors ligne (podcasts et épisodes masqués exclus). */
+    public static List<Episode> favorites() {
+        ArrayList<Episode> l = new ArrayList<>();
+        for (String id : set("favoris")) {
+            Episode e = episode(id);
+            if (e != null && audio(e).exists() && !isHidden(e.id) && !isHidden(e.podcastId)) l.add(e);
+        }
+        Collections.sort(l, NEWEST_FIRST);
+        return l;
+    }
+
+    /** Dernier épisode écouté et la liste d'où il vient (id de podcast ou FAVORIS). */
+    public static final String FAVORIS = "__favoris__";
+    public static void setLast(String eid, String listId) { prefs.edit().putString("dernier_ep", eid).putString("dernier_liste", listId).apply(); }
+    public static String lastEpisodeId() { return prefs.getString("dernier_ep", null); }
+    public static String lastListId() { return prefs.getString("dernier_liste", null); }
+
+    // ---------------------------------------------------------------- réglages du soir
+
+    public static int eveningBrightness() { return prefs.getInt("soir_luminosite", 0); }
+    public static void setEveningBrightness(int b) { prefs.edit().putInt("soir_luminosite", b).apply(); }
+    public static int eveningMaxVolume() { return prefs.getInt("soir_volmax", 0); }
+    public static void setEveningMaxVolume(int v) { prefs.edit().putInt("soir_volmax", v).apply(); }
+    /** Luminosité à appliquer maintenant (le soir, celle du soir si elle est réglée). */
+    public static int effectiveBrightness() {
+        int e = eveningBrightness();
+        return e > 0 && inEvening() ? e : brightness();
+    }
+    /** Volume maximum à appliquer maintenant (le soir, celui du soir s'il est réglé). */
+    public static int effectiveMaxVolume() {
+        int e = eveningMaxVolume();
+        return e > 0 && inEvening() ? Math.min(e, maxVolume()) : maxVolume();
+    }
+
+    // ---------------------------------------------------------------- sauvegarde / restauration
+
+    private static final java.util.Set<String> NOT_SAVED = new java.util.HashSet<>(java.util.Arrays.asList(
+            "journal", "maj_statut", "maj_verif", "derniere_maj", "ecoutes_jour", "ecoutes", "ecoute_ms",
+            "soir_cle", "soir_ep", "soir_ms", "dernier_ep", "dernier_liste", "essais_echec"));
+
+    private static JSONObject dumpPrefs(SharedPreferences sp, boolean filter) throws Exception {
+        JSONObject o = new JSONObject();
+        for (java.util.Map.Entry<String, ?> en : sp.getAll().entrySet()) {
+            if (filter && NOT_SAVED.contains(en.getKey())) continue;
+            Object v = en.getValue();
+            JSONObject t = new JSONObject();
+            if (v instanceof Boolean) t.put("b", v);
+            else if (v instanceof Integer) t.put("i", v);
+            else if (v instanceof Long) t.put("l", v);
+            else if (v instanceof Float) t.put("f", ((Float) v).doubleValue());
+            else if (v instanceof String) t.put("s", v);
+            else if (v instanceof java.util.Set) { JSONArray a = new JSONArray(); for (Object x : (java.util.Set<?>) v) a.put(String.valueOf(x)); t.put("set", a); }
+            else continue;
+            o.put(en.getKey(), t);
+        }
+        return o;
+    }
+
+    private static void loadPrefs(SharedPreferences sp, JSONObject o) throws Exception {
+        SharedPreferences.Editor ed = sp.edit();
+        java.util.Iterator<String> it = o.keys();
+        while (it.hasNext()) {
+            String k = it.next();
+            JSONObject t = o.getJSONObject(k);
+            if (t.has("b")) ed.putBoolean(k, t.getBoolean("b"));
+            else if (t.has("i")) ed.putInt(k, t.getInt("i"));
+            else if (t.has("l")) ed.putLong(k, t.getLong("l"));
+            else if (t.has("f")) ed.putFloat(k, (float) t.getDouble("f"));
+            else if (t.has("s")) ed.putString(k, t.getString("s"));
+            else if (t.has("set")) {
+                JSONArray a = t.getJSONArray("set");
+                java.util.Set<String> set = new java.util.HashSet<>();
+                for (int i = 0; i < a.length(); i++) set.add(a.getString(i));
+                ed.putStringSet(k, set);
+            }
+        }
+        ed.apply();
+    }
+
+    /** Podcasts, réglages, favoris, épisodes masqués et positions de lecture, en JSON. */
+    public static String exportBackup() throws Exception {
+        JSONObject root = new JSONObject();
+        root.put("appli", "Boîte à histoires");
+        root.put("version", 1);
+        root.put("date", System.currentTimeMillis());
+        JSONArray pa = new JSONArray();
+        for (Podcast p : podcasts()) {
+            JSONObject o = new JSONObject();
+            o.put("name", p.name);
+            o.put("feed", p.feedUrl);
+            o.put("skip", p.skipSeconds);
+            o.put("keep", p.keep);
+            pa.put(o);
+        }
+        root.put("podcasts", pa);
+        root.put("reglages", dumpPrefs(prefs, true));
+        root.put("positions", dumpPrefs(positions, false));
+        return root.toString(2);
+    }
+
+    /** @return le nombre de podcasts ajoutés. */
+    public static int importBackup(String json) throws Exception {
+        JSONObject root = new JSONObject(json);
+        if (!root.has("podcasts") || !root.has("reglages")) throw new Exception("ce fichier n'est pas une sauvegarde de Boîte à histoires.");
+        loadPrefs(prefs, root.getJSONObject("reglages"));
+        if (root.has("positions")) loadPrefs(positions, root.getJSONObject("positions"));
+        int added = 0;
+        JSONArray pa = root.getJSONArray("podcasts");
+        for (int i = 0; i < pa.length(); i++) {
+            JSONObject o = pa.getJSONObject(i);
+            String feed = o.optString("feed", "");
+            if (feed.isEmpty()) continue;
+            Podcast p = addPodcast(o.optString("name", "Podcast"), feed, null, o.optInt("skip", 0));
+            if (p != null) { added++; setKeep(p.id, o.optInt("keep", defaultKeep())); }
+            else {
+                Podcast ex = podcast(hash(feed.trim()));
+                if (ex != null) { setSkip(ex.id, o.optInt("skip", ex.skipSeconds)); setKeep(ex.id, o.optInt("keep", ex.keep)); }
+            }
+        }
+        changed();
+        return added;
+    }
+
+    public static int retries() { return prefs.getInt("essais_echec", 0); }
+    public static void setRetries(int n) { prefs.edit().putInt("essais_echec", n).apply(); }
+
     public static boolean firstRunDone() { return prefs.getBoolean("init", false); }
     public static void setFirstRunDone() { prefs.edit().putBoolean("init", true).apply(); }
 }

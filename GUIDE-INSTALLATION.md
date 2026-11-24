@@ -86,7 +86,7 @@ Au démarrage ou au réveil de l'écran, on arrive directement sur l'appli. Pour
 
 ## 5. Utilisation
 
-- **Enfant** : il touche l'image d'un podcast, puis l'image d'un épisode, et ça joue. Il y a 3 gros boutons : précédent, lecture/pause, suivant. La flèche orange sert à revenir en arrière. Un ✔ vert marque les épisodes déjà écoutés.
+- **Enfant** : il touche l'image d'un podcast, puis l'image d'un épisode, et ça joue. Il y a 3 gros boutons : précédent, lecture/pause, suivant. La flèche orange sert à revenir en arrière. Un ✔ vert marque les épisodes déjà écoutés, un ▶ bleu ceux commencés (ils reprennent là où il s'était arrêté, même après avoir éteint le téléphone : le dernier épisode attend dans la barre du bas). Le **cœur** en haut à droite du lecteur ajoute l'histoire à **Mes favoris**, une case rose en tête de l'accueil ; les favoris ne sont jamais effacés.
 - **Espace parents** : fais un **appui long de 3 secondes tout en haut à droite** de l'écran d'accueil (la page avec les images des podcasts), à droite du titre « Boîte à histoires » (zone invisible), puis tape le code **1234**. Pense à le changer.
   - **Ajouter un podcast** : donne un nom et un lien (flux RSS ou lien Apple Podcasts). Avec juste le nom, l'appli cherche sur Apple Podcasts le podcast au nom le plus proche, et refuse si rien ne ressemble vraiment (colle alors le lien). Le résultat est noté dans le Journal. Le téléchargement démarre tout de suite.
   - **Passer le début** : c'est le nombre de secondes de jingle à sauter, réglable pour chaque podcast (Les Bestioles : 6 s au départ).
@@ -94,10 +94,13 @@ Au démarrage ou au réveil de l'écran, on arrive directement sur l'appli. Pour
   - **Épisodes gardés** : c'est le nombre d'épisodes les plus récents gardés sur le téléphone (30 par défaut). Ceux qui disparaissent du flux sont conservés quand même.
   - **Limites d'écoute** : une limite pour toute la journée et une autre pour le soir (aux heures du mode nuit). Chacune se compte en épisodes écoutés jusqu'au bout ou en minutes de vraie lecture (la pause ne compte pas). Le soir a son propre compteur, qui démarre à zéro. Quand la limite est atteinte, l'histoire en cours va jusqu'au bout (même si ça dépasse les minutes) sans pouvoir en changer, puis la lecture s'arrête, une lune s'affiche et l'enfant ne peut pas relancer. La limite du jour repart à zéro à minuit, celle du soir à chaque début de soirée, ou avec le bouton « Remettre le compteur à zéro ».
   - **Luminosité** : l'appli garde toujours la luminosité choisie.
+  - **Le soir** : une luminosité et un volume maximum à part pour les heures du soir.
+  - **Masquer / Afficher** un podcast, et **Épisodes visibles…** pour cacher certains épisodes sans les supprimer.
+  - **Sauvegarde et restauration** : enregistre dans un fichier la liste des podcasts, les réglages, les favoris et la progression, et les remet sur un téléphone neuf ou après une réinstallation.
   - **Mode nuit** : le soir (19 h à 7 h par défaut, réglable), les écrans de l'enfant passent sur fond noir. On peut aussi forcer « Toujours jour » ou « Toujours nuit ».
   - **Écran qui s'assombrit** : sans toucher (30 s par défaut), l'écran devient très sombre et le son continue. Un toucher le rallume ; ce premier toucher n'appuie sur aucun bouton. Pendant la lecture, l'écran ne s'éteint plus complètement.
   - Tu y trouves aussi le **volume maximum**, le bouton **« Mettre à jour maintenant »** et **« Quitter le mode kiosque »**.
-- Les épisodes se téléchargent tout seuls toutes les 6 heures quand le téléphone est en Wi-Fi. Ensuite, tout marche hors ligne (dans la voiture par exemple).
+- Les épisodes se téléchargent tout seuls toutes les 6 heures quand le téléphone est en Wi-Fi. Ensuite, tout marche hors ligne (dans la voiture par exemple). Si un téléchargement rate, l'appli réessaie toute seule (3 fois tout de suite, puis 15 min, 30 min, 1 h… plus tard).
 - En haut de l'écran d'accueil, une petite **pile** montre la batterie : verte, orange sous 35 %, rouge sous 15 % (éclair quand il est branché).
 - Pour **éteindre** : appui long sur le bouton marche/arrêt.
 
